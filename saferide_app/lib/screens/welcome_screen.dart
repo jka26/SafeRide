@@ -104,12 +104,12 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                   children: [
                     const SizedBox(height: 25),
 
-                    // ── Logo ─────────────────────────────────
+                    // Logo
                     _LogoBadge(),
  
                     const SizedBox(height: 24),
  
-                    // ── App name ──────────────────────────────
+                    // App name
                     RichText(
                       textAlign: TextAlign.center,
                       text: const TextSpan(
@@ -142,7 +142,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
  
                     const SizedBox(height: 10),
 
-                    // ── Tagline ───────────────────────────────
+                    // Tagline
                     Text(
                       'Every journey, accounted for.\nEvery ward, safe.',
                       textAlign: TextAlign.center,
@@ -157,7 +157,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
  
                     const SizedBox(height: 20),
 
-                     // ── Trust badges row ──────────────────────
+                     // Trust badges row
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -183,7 +183,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
  
                     const SizedBox(height: 32),
 
-                    // ── Divider ───────────────────────────────
+                    // Divider
                     Row(
                       children: [
                         Expanded(
@@ -212,7 +212,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
  
                     const SizedBox(height: 28),
 
-                    // ── Feature cards ─────────────────────────
+                    // Feature cards
                     _FeatureCard(
                       icon: Icons.location_on_rounded,
                       iconColor: AppColors.secondary,
@@ -242,7 +242,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
  
                     const SizedBox(height: 40),
 
-                    // ── CTA buttons ───────────────────────────
+                    // CTA buttons
                     _PrimaryButton(
                       label: 'Create an account',
                       onTap: _goToSignUp,
@@ -255,7 +255,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
  
                     const SizedBox(height: 28),
  
-                    // ── Footer ────────────────────────────────
+                    // Footer
                     Text(
                       'By continuing, you agree to our\nTerms of Service and Privacy Policy',
                       textAlign: TextAlign.center,
@@ -279,7 +279,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     }
   }
 
-// ── Logo Badge ──────────────────────────────────────────────────────────────── 
+// Logo Badge
 class _LogoBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -347,7 +347,7 @@ class _LogoBadge extends StatelessWidget {
   }
 }
 
-// ── Trust Badge ───────────────────────────────────────────────────────────────
+// Trust Badge
 class _TrustBadge extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -388,7 +388,7 @@ class _TrustBadge extends StatelessWidget {
   }
 }
 
-// ── Feature Card ─────────────────────────────────────────────────────────────
+// Feature Card
 class _FeatureCard extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
@@ -458,7 +458,7 @@ class _FeatureCard extends StatelessWidget {
   }
 }
 
-// ── Primary Button (amber) ────────────────────────────────────────────────────
+// Primary Button (amber)
  
 class _PrimaryButton extends StatefulWidget {
   final String label;
@@ -517,7 +517,7 @@ class _PrimaryButtonState extends State<_PrimaryButton> {
   }
 }
  
-// ── Secondary Button (outlined white) ────────────────────────────────────────
+// Secondary Button (outlined white)
  
 class _SecondaryButton extends StatefulWidget {
   final String label;

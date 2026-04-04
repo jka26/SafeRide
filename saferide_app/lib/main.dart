@@ -1,11 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:saferide_app/screens/welcome_screen.dart';
+import 'package:provider/provider.dart';
+import 'providers/auth_provider.dart';
+import "providers/dashboard_provider.dart";
+import "providers/csv_upload_provider.dart";
 
 void main() {
   WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
   FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
-  runApp(const SafeRideApp());
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProvider(create: (_) => DashboardProvider()),
+        ChangeNotifierProvider(create: (_) => CsvUploadProvider()),
+      ],
+      child: const SafeRideApp(),
+    ),
+  );
 }
 
 class SafeRideApp extends StatefulWidget {

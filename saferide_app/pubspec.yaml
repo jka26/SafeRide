@@ -36,6 +36,9 @@ dependencies:
   cupertino_icons: ^1.0.8
   provider: ^6.1.5+1
   flutter_native_splash: ^2.4.7
+  file_picker: ^8.1.2
+  csv: ^5.1.1
+  http: ^1.2.0
 
 dev_dependencies:
   flutter_test:
