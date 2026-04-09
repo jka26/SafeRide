@@ -1,6 +1,7 @@
 import {
   ConflictException,
   Injectable,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
@@ -11,7 +12,7 @@ import { LoginDto } from './dto/login.dto';
 
 @Injectable()
 export class AuthService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   async signUp(dto: SignUpDto) {
     const exists = await this.prisma.user.findUnique({
@@ -75,5 +76,14 @@ export class AuthService {
         fullName: user.fullName,
       },
     };
+  }
+
+  async logout(token: string) {
+    const session = await this.prisma.session.findUnique({ where: { token } });
+    if (!session) {
+      throw new NotFoundException('Session not found');
+    }
+    await this.prisma.session.delete({ where: { token } });
+    return { message: 'Logged out successfully' };
   }
 }
