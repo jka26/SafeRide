@@ -18,4 +18,23 @@ class BusModel {
     required this.routeProgress,
     required this.status,
   });
+
+  factory BusModel.fromAdminTrip(Map<String, dynamic> json) {
+    final bus = (json['bus'] ?? const <String, dynamic>{}) as Map<String, dynamic>;
+    final driver = (json['driver'] ?? const <String, dynamic>{}) as Map<String, dynamic>;
+    final driverUser = (driver['user'] ?? const <String, dynamic>{}) as Map<String, dynamic>;
+    final countMap = (json['_count'] ?? const <String, dynamic>{}) as Map<String, dynamic>;
+    final attendanceCount = (countMap['attendances'] as num?)?.toInt() ?? 0;
+
+    return BusModel(
+      id: (json['id'] ?? '').toString(),
+      busNumber: (bus['plateNumber'] ?? '--').toString(),
+      routeName: (bus['routeName'] ?? '--').toString(),
+      driverName: (driverUser['fullName'] ?? 'Unassigned').toString(),
+      totalStudents: attendanceCount,
+      studentsOnBoard: attendanceCount,
+      routeProgress: 0,
+      status: 'active',
+    );
+  }
 }

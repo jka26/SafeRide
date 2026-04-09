@@ -78,4 +78,15 @@ class CsvStudentModel {
     }
     return name.isNotEmpty ? name[0].toUpperCase() : '?';
   }
+
+  factory CsvStudentModel.fromBackendRow(Map<String, dynamic> row) {
+    return CsvStudentModel(
+      name: (row['fullName'] ?? '').toString(),
+      grade: (row['grade'] ?? '').toString(),
+      stopName: '',
+      dropOffTime: '',
+      emergencyContactName: '',
+      emergencyContactPhone: '',
+    );
+  }
 }

@@ -1,28 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:csv/csv.dart';
 import 'dart:io';
 import '../../theme/app_theme.dart';
 import '../../providers/csv_upload_provider.dart';
 import '../../models/csv_student_model.dart';
-
-// Mock routes and buses — replace with API data when backend is ready
-const _mockRoutes = [
-  {'id': 'r1', 'name': 'Route North'},
-  {'id': 'r2', 'name': 'Route East'},
-  {'id': 'r3', 'name': 'Route South'},
-  {'id': 'r4', 'name': 'Route West'},
-  {'id': 'r5', 'name': 'Route Central'},
-];
-
-const _mockBuses = [
-  {'id': 'b1', 'name': 'Bus B-42'},
-  {'id': 'b2', 'name': 'Bus B-38'},
-  {'id': 'b3', 'name': 'Bus B-51'},
-  {'id': 'b4', 'name': 'Bus B-29'},
-  {'id': 'b5', 'name': 'Bus B-15'},
-];
 
 class CsvUploadScreen extends StatelessWidget {
   const CsvUploadScreen({super.key});
@@ -62,7 +44,7 @@ class _CsvUploadBody extends StatelessWidget {
       body: provider.isSuccess
           ? _SuccessView(
               count: provider.uploadedCount,
-              routeName: provider.selectedRouteName ?? '',
+              routeName: '',
               onUploadAnother: () => context.read<CsvUploadProvider>().reset(),
             )
           : provider.isPreviewing
@@ -103,8 +85,7 @@ class _UploadView extends StatelessWidget {
                   child: Text(
                     'Upload a CSV file with student details. '
                     'The file must have columns in this order:\n'
-                    'name, grade, stop_name, drop_off_time, '
-                    'emergency_contact_name, emergency_contact_phone',
+                    'studentCode, fullName, grade',
                     style: TextStyle(
                       fontFamily: 'Outfit', fontSize: 12,
                       color: Color(0xFF6D28D9), height: 1.6,
@@ -114,50 +95,7 @@ class _UploadView extends StatelessWidget {
               ],
             ),
           ),
-
           const SizedBox(height: 24),
-
-          // Route selector
-          const _SectionLabel(label: 'Select Route'),
-          const SizedBox(height: 8),
-          _DropdownField(
-            hint: 'Choose a route',
-            icon: Icons.route_rounded,
-            value: provider.selectedRouteName,
-            items: _mockRoutes
-                .map((r) => r['name']!)
-                .toList(),
-            onChanged: (val) {
-              final route = _mockRoutes
-                  .firstWhere((r) => r['name'] == val);
-              context
-                  .read<CsvUploadProvider>()
-                  .selectRoute(route['id']!, route['name']!);
-            },
-          ),
-
-          const SizedBox(height: 16),
-
-          // Bus selector
-          const _SectionLabel(label: 'Select Bus'),
-          const SizedBox(height: 8),
-          _DropdownField(
-            hint: 'Choose a bus',
-            icon: Icons.directions_bus_rounded,
-            value: provider.selectedBusName,
-            items: _mockBuses
-                .map((b) => b['name']!)
-                .toList(),
-            onChanged: (val) {
-              final bus =
-                  _mockBuses.firstWhere((b) => b['name'] == val);
-              context
-                  .read<CsvUploadProvider>()
-                  .selectBus(bus['id']!, bus['name']!);
-            },
-          ),
-
-          const SizedBox(height: 28),
 
           // CSV format guide
           const _SectionLabel(label: 'CSV Format'),
@@ -179,9 +117,7 @@ class _UploadView extends StatelessWidget {
                     color: AppColors.textPrimary)),
                 const SizedBox(height: 8),
                 ...[
-                  'name', 'grade', 'stop_name',
-                  'drop_off_time', 'emergency_contact_name',
-                  'emergency_contact_phone',
+                  'studentCode', 'fullName', 'grade',
                 ].asMap().entries.map((e) => Padding(
                   padding: const EdgeInsets.only(bottom: 4),
                   child: Row(children: [
@@ -214,10 +150,10 @@ class _UploadView extends StatelessWidget {
 
           // Upload button
           _PickFileButton(
-            onFilePicked: (rows, fileName) {
+            onFilePicked: (csvText, fileName) {
               context
                   .read<CsvUploadProvider>()
-                  .loadParsedStudents(rows, fileName);
+                  .previewCsv(csvText, fileName);
             },
           ),
 
@@ -234,7 +170,7 @@ class _UploadView extends StatelessWidget {
 // ── File picker button ────────────────────────────────────────────────────────
 
 class _PickFileButton extends StatefulWidget {
-  final Function(List<List<dynamic>>, String) onFilePicked;
+  final Function(String, String) onFilePicked;
   const _PickFileButton({required this.onFilePicked});
 
   @override
@@ -265,8 +201,7 @@ class _PickFileButtonState extends State<_PickFileButton> {
           throw Exception('Could not read file.');
         }
 
-        final rows = const CsvToListConverter().convert(csvString);
-        widget.onFilePicked(rows, file.name);
+        widget.onFilePicked(csvString, file.name);
       }
     } catch (e) {
       if (mounted) {
@@ -356,12 +291,6 @@ class _PreviewView extends StatelessWidget {
                     style: const TextStyle(fontFamily: 'Outfit', fontSize: 13,
                       fontWeight: FontWeight.w600, color: AppColors.textPrimary),
                     overflow: TextOverflow.ellipsis),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${provider.selectedRouteName ?? "--"}  ·  '
-                    '${provider.selectedBusName ?? "--"}',
-                    style: const TextStyle(fontFamily: 'Outfit', fontSize: 11,
-                      color: AppColors.textSecondary)),
                 ],
               )),
               _CountBadge(count: valid.length, label: 'valid',
@@ -543,36 +472,8 @@ class _PreviewStudentTile extends StatelessWidget {
                 Text(student.grade,
                   style: const TextStyle(fontFamily: 'Outfit', fontSize: 11,
                     color: AppColors.textSecondary)),
-                const SizedBox(height: 4),
-                Row(children: [
-                  const Icon(Icons.location_on_rounded,
-                      size: 11, color: AppColors.textHint),
-                  Text(' ${student.stopName}',
-                    style: const TextStyle(fontFamily: 'Outfit', fontSize: 11,
-                      color: AppColors.textHint)),
-                  const SizedBox(width: 8),
-                  const Icon(Icons.schedule_rounded,
-                      size: 11, color: AppColors.textHint),
-                  Text(' ${student.dropOffTime}',
-                    style: const TextStyle(fontFamily: 'Outfit', fontSize: 11,
-                      color: AppColors.textHint)),
-                ]),
               ],
             ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              const Icon(Icons.emergency_rounded,
-                  size: 12, color: AppColors.textHint),
-              const SizedBox(height: 2),
-              Text(student.emergencyContactName,
-                style: const TextStyle(fontFamily: 'Outfit', fontSize: 10,
-                  color: AppColors.textHint)),
-              Text(student.emergencyContactPhone,
-                style: const TextStyle(fontFamily: 'Outfit', fontSize: 10,
-                  color: AppColors.textHint)),
-            ],
           ),
         ],
       ),
@@ -615,7 +516,9 @@ class _SuccessView extends StatelessWidget {
               fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
           const SizedBox(height: 10),
           Text(
-            '$count student${count != 1 ? "s" : ""} have been added to $routeName.',
+            routeName.isEmpty
+                ? '$count student${count != 1 ? "s" : ""} have been added.'
+                : '$count student${count != 1 ? "s" : ""} have been added to $routeName.',
             textAlign: TextAlign.center,
             style: const TextStyle(fontFamily: 'Outfit', fontSize: 14,
               color: AppColors.textSecondary, height: 1.6)),

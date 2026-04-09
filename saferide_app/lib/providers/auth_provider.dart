@@ -1,11 +1,18 @@
 import 'package:flutter/foundation.dart';
+import '../models/user_model.dart';
+import '../services/auth_service.dart';
 
 enum UserRole { parent, driver, admin }
 enum AuthMethod { emailPassword, phoneOtp }
 enum AuthStatus { idle, loading, success, error }
 
 class AuthProvider extends ChangeNotifier {
+  AuthProvider({AuthService? authService})
+      : _authService = authService ?? AuthService();
+
+  final AuthService _authService;
   UserRole? _selectedRole;
+  UserModel? _currentUser;
   AuthMethod _authMethod = AuthMethod.emailPassword;
   AuthStatus _status = AuthStatus.idle;
   String? _errorMessage;
@@ -14,6 +21,7 @@ class AuthProvider extends ChangeNotifier {
 
   // Getters
   UserRole? get selectedRole => _selectedRole;
+  UserModel? get currentUser => _currentUser;
   AuthMethod get authMethod => _authMethod;
   AuthStatus get status => _status;
   String? get errorMessage => _errorMessage;
@@ -40,27 +48,36 @@ class AuthProvider extends ChangeNotifier {
   // Email / Password login
   Future<void> loginWithEmail(String email, String password) async {
     _setLoading();
-    await Future.delayed(const Duration(seconds: 2)); // Replace with real API call
-
-    if (email.isNotEmpty && password.length >= 6) {
+    try {
+      _currentUser = await _authService.login(email: email, password: password);
+      _selectedRole = _roleFromString(_currentUser?.role);
       _status = AuthStatus.success;
       _errorMessage = null;
-    } else {
-      _setError('Invalid email or password. Please try again.');
+    } catch (e) {
+      _setError(e.toString());
     }
     notifyListeners();
   }
 
   // Sign up
-  Future<void> signUpWithEmail(String email, String password) async {
+  Future<void> signUpWithEmail(
+    String email,
+    String password, {
+    required String fullName,
+  }) async {
     _setLoading();
-    await Future.delayed(const Duration(seconds: 2)); // Replace with real API call
-
-    if (email.isNotEmpty && password.length >= 6) {
+    try {
+      _currentUser = await _authService.signUp(
+        email: email,
+        password: password,
+        fullName: fullName,
+        role: (_selectedRole ?? UserRole.parent).name,
+      );
+      _selectedRole = _roleFromString(_currentUser?.role);
       _status = AuthStatus.success;
       _errorMessage = null;
-    } else {
-      _setError('Could not create account. Please check your details.');
+    } catch (e) {
+      _setError(e.toString());
     }
     notifyListeners();
   }
@@ -91,8 +108,10 @@ class AuthProvider extends ChangeNotifier {
   }
 
   // Sign out
-  void signOut() {
+  Future<void> signOut() async {
+    await _authService.logout();
     _selectedRole = null;
+    _currentUser = null;
     _status = AuthStatus.idle;
     _errorMessage = null;
     _isOtpSent = false;
@@ -117,5 +136,18 @@ class AuthProvider extends ChangeNotifier {
   void _setError(String message) {
     _status = AuthStatus.error;
     _errorMessage = message;
+  }
+
+  UserRole? _roleFromString(String? role) {
+    switch ((role ?? '').toUpperCase()) {
+      case 'ADMIN':
+        return UserRole.admin;
+      case 'DRIVER':
+        return UserRole.driver;
+      case 'PARENT':
+        return UserRole.parent;
+      default:
+        return null;
+    }
   }
 }

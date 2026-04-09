@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import '../../theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
 import 'login_screen.dart';
-import 'dashboard/dashboard_screen.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -20,6 +19,7 @@ class _SignUpScreenState extends State<SignUpScreen>
   late Animation<Offset> _slideUp;
 
   final _emailCtrl = TextEditingController();
+  final _fullNameCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   final _confirmPasswordCtrl = TextEditingController();
   final _formKey = GlobalKey<FormState>();
@@ -60,6 +60,7 @@ class _SignUpScreenState extends State<SignUpScreen>
   void dispose() {
     _controller.dispose();
     _emailCtrl.dispose();
+    _fullNameCtrl.dispose();
     _passwordCtrl.dispose();
     _confirmPasswordCtrl.dispose();
     super.dispose();
@@ -100,12 +101,12 @@ class _SignUpScreenState extends State<SignUpScreen>
     await context.read<AuthProvider>().signUpWithEmail(
           _emailCtrl.text.trim(),
           _passwordCtrl.text,
+          fullName: _fullNameCtrl.text.trim(),
         );
     final auth = context.read<AuthProvider>();
     if (auth.status == AuthStatus.success && mounted) {
-      // TODO: navigate to Onboarding Step 1
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const DashboardScreen()),
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
       );
     }
   }
@@ -234,6 +235,22 @@ class _SignUpScreenState extends State<SignUpScreen>
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              const _FieldLabel(label: 'Full name'),
+                              const SizedBox(height: 10),
+                              _InputField(
+                                controller: _fullNameCtrl,
+                                hint: 'Jane Doe',
+                                icon: Icons.person_outline_rounded,
+                                validator: (v) {
+                                  if (v == null || v.trim().length < 2) {
+                                    return 'Full name is required';
+                                  }
+                                  return null;
+                                },
+                              ),
+
+                              const SizedBox(height: 16),
+
                               // Email
                               const _FieldLabel(label: 'Email address'),
                               const SizedBox(height: 10),

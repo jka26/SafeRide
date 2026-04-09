@@ -4,10 +4,24 @@ import '../models/bus_model.dart';
 import '../models/trip_model.dart';
 import '../models/notification_model.dart';
 import '../models/user_model.dart';
+import '../services/attendance_service.dart';
+import '../services/dashboard_service.dart';
+import '../services/notification_service.dart';
 
 enum DashboardStatus { idle, loading, loaded, error }
 
 class DashboardProvider extends ChangeNotifier {
+  DashboardProvider({
+    DashboardService? dashboardService,
+    NotificationService? notificationService,
+    AttendanceService? attendanceService,
+  })  : _dashboardService = dashboardService ?? DashboardService(),
+        _notificationService = notificationService ?? NotificationService(),
+        _attendanceService = attendanceService ?? AttendanceService();
+
+  final DashboardService _dashboardService;
+  final NotificationService _notificationService;
+  final AttendanceService _attendanceService;
   DashboardStatus _status = DashboardStatus.idle;
   String? _errorMessage;
 
@@ -62,101 +76,54 @@ class DashboardProvider extends ChangeNotifier {
   // ── Load dashboard based on role ───────────────────────────
   Future<void> loadDashboard(String role) async {
     _status = DashboardStatus.loading;
+    _errorMessage = null;
     notifyListeners();
-
-    await Future.delayed(const Duration(milliseconds: 800));
 
     try {
       switch (role) {
         case 'parent':
-          _loadParentData();
+          await _loadParentData();
           break;
         case 'driver':
-          _loadDriverData();
+          await _loadDriverData();
           break;
         case 'admin':
-          _loadAdminData();
+          await _loadAdminData();
           break;
       }
+      _notifications = await _notificationService.getNotifications();
       _status = DashboardStatus.loaded;
     } catch (e) {
       _status = DashboardStatus.error;
-      _errorMessage = 'Failed to load dashboard. Please try again.';
+      _errorMessage = e.toString();
     }
     notifyListeners();
   }
 
-  // ── Mock data — replace with real API calls ────────────────
-
-  void _loadParentData() {
-    _currentUser = const UserModel(
-      id: '1', name: 'Emma Johnson',
-      email: 'parent@school.edu', role: 'parent',
-    );
-    _child = const StudentModel(
-      id: 's1', name: 'Emma Johnson',
-      grade: 'Grade 5', stopName: 'Stop 8',
-      dropOffTime: '03:45 PM', status: 'boarded',
-    );
-    _activeTrip = const TripModel(
-      id: 't1', routeName: 'Route North',
-      busNumber: 'B-42', status: 'active',
-      estimatedArrival: '8 minutes',
-      currentStop: 'Stop 8', totalStops: 12,
-      currentStopNumber: 8, pickupTime: '07:30 AM',
-      dropOffTime: '03:45 PM', pickupCompleted: true,
-    );
-    _notifications = const [
-      NotificationModel(
-        id: 'n1',
-        message: 'Bus is 10 minutes away',
-        timeAgo: '2 min ago', type: 'info',
-      ),
-      NotificationModel(
-        id: 'n2',
-        message: 'Emma boarded the bus',
-        timeAgo: '25 min ago', type: 'success',
-      ),
-      NotificationModel(
-        id: 'n3',
-        message: 'Slight delay due to traffic',
-        timeAgo: '1 hour ago', type: 'warning',
-      ),
-    ];
+  Future<void> _loadParentData() async {
+    final data = await _dashboardService.getParentDashboard();
+    _currentUser = data.currentUser;
+    _child = data.children.isNotEmpty ? data.children.first : null;
+    _activeTrip = data.activeTrip;
   }
 
-  void _loadDriverData() {
-    _currentUser = const UserModel(
-      id: '2', name: 'John Davis',
-      email: 'driver@school.edu', role: 'driver',
-    );
-    _students = const [
-      StudentModel(id: 's1', name: 'Emma Johnson', grade: 'Grade 5', stopName: 'Stop 4', dropOffTime: '03:45 PM', status: 'pending'),
-      StudentModel(id: 's2', name: 'Liam Smith', grade: 'Grade 6', stopName: 'Stop 4', dropOffTime: '03:45 PM', status: 'pending'),
-      StudentModel(id: 's3', name: 'Olivia Brown', grade: 'Grade 4', stopName: 'Stop 5', dropOffTime: '03:52 PM', status: 'pending'),
-      StudentModel(id: 's4', name: 'Noah Davis', grade: 'Grade 5', stopName: 'Stop 5', dropOffTime: '03:52 PM', status: 'absent'),
-      StudentModel(id: 's5', name: 'Ava Wilson', grade: 'Grade 7', stopName: 'Stop 6', dropOffTime: '03:58 PM', status: 'pending'),
-      StudentModel(id: 's6', name: 'Ethan Martinez', grade: 'Grade 5', stopName: 'Stop 6', dropOffTime: '03:58 PM', status: 'pending'),
-    ];
+  Future<void> _loadDriverData() async {
+    final data = await _dashboardService.getDriverDashboard();
+    _currentUser = data.currentUser;
+    _students = data.students;
+    _activeTrip = data.activeTrip;
+    _tripStarted = _activeTrip != null;
   }
 
-  void _loadAdminData() {
-    _currentUser = const UserModel(
-      id: '3', name: 'Admin',
-      email: 'admin@school.edu', role: 'admin',
-    );
-    _buses = const [
-      BusModel(id: 'b1', busNumber: 'B-42', routeName: 'Route North', driverName: 'John Davis', totalStudents: 24, studentsOnBoard: 24, routeProgress: 0.67, status: 'active'),
-      BusModel(id: 'b2', busNumber: 'B-38', routeName: 'Route East', driverName: 'Sarah Miller', totalStudents: 28, studentsOnBoard: 20, routeProgress: 0.45, status: 'active'),
-      BusModel(id: 'b3', busNumber: 'B-51', routeName: 'Route South', driverName: 'Mike Johnson', totalStudents: 22, studentsOnBoard: 10, routeProgress: 0.30, status: 'delayed'),
-      BusModel(id: 'b4', busNumber: 'B-29', routeName: 'Route West', driverName: 'Emily Brown', totalStudents: 26, studentsOnBoard: 26, routeProgress: 1.0, status: 'completed'),
-      BusModel(id: 'b5', busNumber: 'B-15', routeName: 'Route Central', driverName: 'David Wilson', totalStudents: 0, studentsOnBoard: 0, routeProgress: 0.0, status: 'idle'),
-    ];
-    _totalStudentsOnBoard = 74;
-    _activeAlerts = 1;
-    _completedTrips = 1;
-    _activeRoutes = 5;
-    _onTimeRate = 98.0;
+  Future<void> _loadAdminData() async {
+    final data = await _dashboardService.getAdminDashboard();
+    _currentUser = data.currentUser;
+    _buses = data.buses;
+    _totalStudentsOnBoard = data.totalStudentsOnBoard;
+    _activeAlerts = data.activeAlerts;
+    _completedTrips = data.completedTrips;
+    _activeRoutes = data.activeRoutes;
+    _onTimeRate = data.onTimeRate;
   }
 
   // ── Driver actions ─────────────────────────────────────────
@@ -165,17 +132,39 @@ class DashboardProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void updateStudentStatus(String studentId, String newStatus) {
-    _students = _students.map((s) {
-      if (s.id == studentId) {
-        return StudentModel(
-          id: s.id, name: s.name, grade: s.grade,
-          stopName: s.stopName, dropOffTime: s.dropOffTime,
-          status: newStatus,
-        );
-      }
-      return s;
-    }).toList();
+  Future<void> updateStudentStatus(String studentId, String newStatus) async {
+    final tripId = _activeTrip?.id;
+    if (tripId == null) {
+      _errorMessage = 'No trip is available for attendance updates.';
+      notifyListeners();
+      return;
+    }
+
+    try {
+      await _attendanceService.markAttendance(
+        studentId: studentId,
+        tripId: tripId,
+        status: newStatus == 'absent' ? 'ABSENT' : 'PRESENT',
+      );
+      _students = _students.map((s) {
+        if (s.id == studentId) {
+          return StudentModel(
+            id: s.id,
+            name: s.name,
+            grade: s.grade,
+            stopId: s.stopId,
+            stopName: s.stopName,
+            dropOffTime: s.dropOffTime,
+            status: newStatus,
+            latestTrip: s.latestTrip,
+          );
+        }
+        return s;
+      }).toList();
+      _errorMessage = null;
+    } catch (e) {
+      _errorMessage = e.toString();
+    }
     notifyListeners();
   }
 }
