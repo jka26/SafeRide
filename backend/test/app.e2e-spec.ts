@@ -77,26 +77,30 @@ describe('SafeRide API (e2e)', () => {
     const parentEmail = `parent_e2e_${Date.now()}@test.com`;
     const password = 'TestPass123!';
 
-    it('POST /api/auth/signup — creates admin account', async () => {
+    it('POST /api/auth/signup — creates admin account and returns session', async () => {
       const res = await request(app.getHttpServer())
         .post('/api/auth/signup')
         .send({ email: adminEmail, password, fullName: 'E2E Admin', role: 'ADMIN' })
         .expect(201);
-      expect(res.body.email).toBe(adminEmail);
+      expect(res.body.token).toBeDefined();
+      expect(res.body.expiresAt).toBeDefined();
+      expect(res.body.user.email).toBe(adminEmail);
     });
 
-    it('POST /api/auth/signup — creates driver account', async () => {
-      await request(app.getHttpServer())
+    it('POST /api/auth/signup — creates driver account with session', async () => {
+      const res = await request(app.getHttpServer())
         .post('/api/auth/signup')
         .send({ email: driverEmail, password, fullName: 'E2E Driver', role: 'DRIVER' })
         .expect(201);
+      expect(res.body.token).toBeDefined();
     });
 
-    it('POST /api/auth/signup — creates parent account', async () => {
-      await request(app.getHttpServer())
+    it('POST /api/auth/signup — creates parent account with session', async () => {
+      const res = await request(app.getHttpServer())
         .post('/api/auth/signup')
         .send({ email: parentEmail, password, fullName: 'E2E Parent', role: 'PARENT' })
         .expect(201);
+      expect(res.body.token).toBeDefined();
     });
 
     it('POST /api/auth/login — logs in admin and returns token', async () => {
@@ -200,6 +204,95 @@ describe('SafeRide API (e2e)', () => {
     });
   });
 
+  describe('Driver trip actions', () => {
+    it('POST /api/driver/trips/:id/start — admin can start trip', async () => {
+      const res = await request(app.getHttpServer())
+        .post(`/api/driver/trips/${tripId}/start`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(201);
+      expect(res.body.status).toBe('IN_PROGRESS');
+    });
+
+    it('POST /api/driver/trips/:id/location — accepts coordinates while in progress', async () => {
+      const res = await request(app.getHttpServer())
+        .post(`/api/driver/trips/${tripId}/location`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ latitude: 5.6037, longitude: -0.187 })
+        .expect(201);
+      expect(res.body.latitude).toBeDefined();
+    });
+
+    it('PATCH /api/driver/trips/:id/progress — updates stop and ETA', async () => {
+      const res = await request(app.getHttpServer())
+        .patch(`/api/driver/trips/${tripId}/progress`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ currentStopName: 'Main St', etaMinutes: 12 })
+        .expect(200);
+      expect(res.body.currentStopName).toBe('Main St');
+      expect(res.body.etaMinutes).toBe(12);
+    });
+
+    it('POST /api/driver/trips/:id/end — completes trip', async () => {
+      const res = await request(app.getHttpServer())
+        .post(`/api/driver/trips/${tripId}/end`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(201);
+      expect(res.body.status).toBe('COMPLETED');
+    });
+  });
+
+  describe('Routes', () => {
+    it('GET /api/routes — authenticated user sees grouped buses', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/routes')
+        .set('Authorization', `Bearer ${parentToken}`)
+        .expect(200);
+      expect(Array.isArray(res.body.routes)).toBe(true);
+    });
+  });
+
+  describe('Users', () => {
+    it('GET /api/users — admin lists users', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/users')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+      expect(Array.isArray(res.body)).toBe(true);
+    });
+
+    it('GET /api/users/:id — admin fetches one user', async () => {
+      const list = await request(app.getHttpServer())
+        .get('/api/users')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+      const firstId = (list.body as { id: string }[])[0]?.id;
+      expect(firstId).toBeDefined();
+      const res = await request(app.getHttpServer())
+        .get(`/api/users/${firstId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+      expect(res.body.email).toBeDefined();
+    });
+
+    it('PATCH /api/users/me — updates display name', async () => {
+      const res = await request(app.getHttpServer())
+        .patch('/api/users/me')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ fullName: 'E2E Admin Updated' })
+        .expect(200);
+      expect(res.body.fullName).toBe('E2E Admin Updated');
+    });
+  });
+
+  describe('Parent tracking', () => {
+    it('GET /api/parent/tracking/trips/:id — 403 when no child on trip', async () => {
+      await request(app.getHttpServer())
+        .get(`/api/parent/tracking/trips/${tripId}`)
+        .set('Authorization', `Bearer ${parentToken}`)
+        .expect(403);
+    });
+  });
+
   /* -------------------------------------------------------------------------
    * Students
    * ---------------------------------------------------------------------- */
@@ -249,6 +342,15 @@ describe('SafeRide API (e2e)', () => {
         .send({ studentId, tripId, status: 'ABSENT' })
         .expect(201);
       expect(res.body.status).toBe('ABSENT');
+    });
+
+    it('POST /api/attendance — supports BOARDED status', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/api/attendance')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ studentId, tripId, status: 'BOARDED' })
+        .expect(201);
+      expect(res.body.status).toBe('BOARDED');
     });
 
     it('POST /api/attendance — parent gets 403', () => {
@@ -377,6 +479,15 @@ describe('SafeRide API (e2e)', () => {
         .expect(200);
       expect(Array.isArray(res.body)).toBe(true);
       expect(res.body.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('GET /api/notifications/unread-count — returns count shape', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/notifications/unread-count')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+      expect(res.body).toHaveProperty('unreadCount');
+      expect(typeof res.body.unreadCount).toBe('number');
     });
 
     it('GET /api/notifications — parent sees role-targeted notifications', async () => {

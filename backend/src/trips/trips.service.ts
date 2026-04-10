@@ -31,11 +31,29 @@ export class TripsService {
   }
 
   update(id: string, dto: UpdateTripDto) {
+    const {
+      tripDate,
+      startedAt,
+      endedAt,
+      status,
+      currentStopName,
+      etaMinutes,
+      name,
+      busId,
+      driverId,
+    } = dto;
     return this.prisma.trip.update({
       where: { id },
       data: {
-        ...dto,
-        tripDate: dto.tripDate ? new Date(dto.tripDate) : undefined,
+        ...(name !== undefined && { name }),
+        ...(busId !== undefined && { busId }),
+        ...(driverId !== undefined && { driverId }),
+        ...(status !== undefined && { status }),
+        ...(currentStopName !== undefined && { currentStopName }),
+        ...(etaMinutes !== undefined && { etaMinutes }),
+        tripDate: tripDate ? new Date(tripDate) : undefined,
+        startedAt: startedAt ? new Date(startedAt) : undefined,
+        endedAt: endedAt ? new Date(endedAt) : undefined,
       },
     });
   }
