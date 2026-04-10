@@ -58,7 +58,6 @@ class _LoginScreenState extends State<LoginScreen>
 
   Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
-    context.read<AuthProvider>().selectRole(UserRole.admin); //remove later
     await context.read<AuthProvider>().loginWithEmail(
           _emailCtrl.text.trim(),
           _passwordCtrl.text,
