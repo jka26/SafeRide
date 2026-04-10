@@ -15,4 +15,28 @@ export class CreateStudentDto {
   @IsOptional()
   @IsString()
   parentId?: string;
+
+  @IsOptional()
+  @IsString()
+  routeName?: string;
+
+  @IsOptional()
+  @IsString()
+  busLabel?: string;
+
+  @IsOptional()
+  @IsString()
+  stopName?: string;
+
+  @IsOptional()
+  @IsString()
+  dropOffTime?: string;
+
+  @IsOptional()
+  @IsString()
+  emergencyContactName?: string;
+
+  @IsOptional()
+  @IsString()
+  emergencyContactPhone?: string;
 }

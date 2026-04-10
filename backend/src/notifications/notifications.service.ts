@@ -87,6 +87,41 @@ export class NotificationsService {
     }
 
     /**
+     * Count unread notifications visible to the current user (same scope as findForUser).
+     */
+    async countUnreadForUser(actor: AuthenticatedUser) {
+        if (actor.role === AppRole.ADMIN) {
+            return this.prisma.notification.count({ where: { isRead: false } });
+        }
+
+        if (actor.role === AppRole.DRIVER) {
+            return this.prisma.notification.count({
+                where: {
+                    isRead: false,
+                    OR: [{ targetRole: 'DRIVER' }, { targetRole: null }],
+                },
+            });
+        }
+
+        const parent = await this.prisma.parent.findUnique({
+            where: { userId: actor.id },
+            select: { students: { select: { id: true } } },
+        });
+
+        const studentIds = parent?.students.map((s) => s.id) ?? [];
+
+        return this.prisma.notification.count({
+            where: {
+                isRead: false,
+                OR: [
+                    { targetRole: 'PARENT' },
+                    { studentId: { in: studentIds } },
+                ],
+            },
+        });
+    }
+
+    /**
      * Mark a notification as read.
      * Any authenticated user can mark notifications they can see.
      */

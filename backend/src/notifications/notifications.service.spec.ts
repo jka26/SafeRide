@@ -12,6 +12,7 @@ const mockPrisma = {
         findUnique: jest.fn(),
         update: jest.fn(),
         delete: jest.fn(),
+        count: jest.fn(),
     },
     student: {
         findUnique: jest.fn(),
@@ -117,6 +118,45 @@ describe('NotificationsService', () => {
                     },
                 }),
             );
+        });
+    });
+
+    describe('countUnreadForUser', () => {
+        it('counts all unread for admin', async () => {
+            mockPrisma.notification.count.mockResolvedValue(5);
+            const n = await service.countUnreadForUser(adminUser);
+            expect(n).toBe(5);
+            expect(mockPrisma.notification.count).toHaveBeenCalledWith({
+                where: { isRead: false },
+            });
+        });
+
+        it('counts unread with driver visibility', async () => {
+            mockPrisma.notification.count.mockResolvedValue(2);
+            await service.countUnreadForUser(driverUser);
+            expect(mockPrisma.notification.count).toHaveBeenCalledWith({
+                where: {
+                    isRead: false,
+                    OR: [{ targetRole: 'DRIVER' }, { targetRole: null }],
+                },
+            });
+        });
+
+        it('counts unread for parent scope', async () => {
+            mockPrisma.parent.findUnique.mockResolvedValue({
+                students: [{ id: 'stu-1' }],
+            });
+            mockPrisma.notification.count.mockResolvedValue(1);
+            await service.countUnreadForUser(parentUser);
+            expect(mockPrisma.notification.count).toHaveBeenCalledWith({
+                where: {
+                    isRead: false,
+                    OR: [
+                        { targetRole: 'PARENT' },
+                        { studentId: { in: ['stu-1'] } },
+                    ],
+                },
+            });
         });
     });
 

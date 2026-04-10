@@ -12,6 +12,8 @@ import { AttendanceModule } from './attendance/attendance.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { CsvImportModule } from './csv-import/csv-import.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { RoutesModule } from './routes/routes.module';
+import { ParentsModule } from './parents/parents.module';
 
 @Module({
   imports: [
@@ -27,6 +29,8 @@ import { DashboardModule } from './dashboard/dashboard.module';
     NotificationsModule,
     CsvImportModule,
     DashboardModule,
+    RoutesModule,
+    ParentsModule,
   ],
   controllers: [AppController],
   providers: [],

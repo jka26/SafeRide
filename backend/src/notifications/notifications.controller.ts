@@ -32,6 +32,16 @@ export class NotificationsController {
     }
 
     /**
+     * GET /api/notifications/unread-count
+     * Unread count for notifications visible to the current user.
+     */
+    @Get('unread-count')
+    async unreadCount(@CurrentUser() user: AuthenticatedUser) {
+        const unreadCount = await this.notificationsService.countUnreadForUser(user);
+        return { unreadCount };
+    }
+
+    /**
      * GET /api/notifications
      * Fetch notifications visible to the current user (role-filtered).
      */

@@ -1,4 +1,5 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { TripStatus } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { AppRole } from '../common/auth/roles.enum';
 import type { AuthenticatedUser } from '../common/auth/authenticated-user.interface';
@@ -16,7 +17,16 @@ export class DashboardService {
         const tomorrow = new Date(today);
         tomorrow.setDate(tomorrow.getDate() + 1);
 
-        const [totalStudents, totalBuses, totalTrips, totalDrivers, todaysTrips, recentNotifications] =
+        const [
+            totalStudents,
+            totalBuses,
+            totalTrips,
+            totalDrivers,
+            todaysTrips,
+            recentNotifications,
+            tripStatusBreakdown,
+            inProgressTrips,
+        ] =
             await Promise.all([
                 this.prisma.student.count(),
                 this.prisma.bus.count(),
@@ -46,6 +56,22 @@ export class DashboardService {
                         createdAt: true,
                     },
                 }),
+                this.prisma.trip.groupBy({
+                    by: ['status'],
+                    _count: { _all: true },
+                }),
+                this.prisma.trip.findMany({
+                    where: { status: TripStatus.IN_PROGRESS },
+                    include: {
+                        bus: { select: { plateNumber: true, routeName: true } },
+                        driver: {
+                            include: { user: { select: { fullName: true } } },
+                        },
+                        locations: { orderBy: { recordedAt: 'desc' }, take: 1 },
+                        _count: { select: { attendances: true } },
+                    },
+                    orderBy: [{ startedAt: 'desc' }, { tripDate: 'desc' }],
+                }),
             ]);
 
         const presentToday = await this.prisma.attendance.count({
@@ -62,6 +88,10 @@ export class DashboardService {
             },
         });
 
+        const tripsByStatus = Object.fromEntries(
+            tripStatusBreakdown.map((row) => [row.status, row._count._all]),
+        ) as Record<string, number>;
+
         return {
             counts: {
                 students: totalStudents,
@@ -75,6 +105,8 @@ export class DashboardService {
             },
             todaysTrips,
             recentNotifications,
+            tripsByStatus,
+            inProgressTrips,
         };
     }
 
@@ -104,6 +136,7 @@ export class DashboardService {
             },
             include: {
                 bus: { select: { plateNumber: true, routeName: true, capacity: true } },
+                locations: { orderBy: { recordedAt: 'desc' }, take: 1 },
                 attendances: {
                     include: {
                         student: {
@@ -137,46 +170,116 @@ export class DashboardService {
      * Parent dashboard: all children, their attendance summaries and latest trip status.
      */
     async getParentDashboard(actor: AuthenticatedUser) {
-        const parent = await this.prisma.parent.findUnique({
-            where: { userId: actor.id },
-            include: {
-                students: {
-                    include: {
-                        attendances: {
-                            include: {
-                                trip: {
-                                    select: {
-                                        id: true,
-                                        name: true,
-                                        tripDate: true,
-                                        bus: { select: { plateNumber: true, routeName: true } },
-                                    },
+        const parentInclude = {
+            students: {
+                include: {
+                    attendances: {
+                        include: {
+                            trip: {
+                                select: {
+                                    id: true,
+                                    name: true,
+                                    tripDate: true,
+                                    status: true,
+                                    currentStopName: true,
+                                    etaMinutes: true,
+                                    bus: { select: { plateNumber: true, routeName: true } },
                                 },
                             },
-                            orderBy: { markedAt: 'desc' },
-                            take: 5,
                         },
-                        notifications: {
-                            orderBy: { createdAt: 'desc' },
-                            take: 3,
-                            select: {
-                                id: true,
-                                title: true,
-                                body: true,
-                                isRead: true,
-                                createdAt: true,
-                            },
+                        orderBy: { markedAt: 'desc' as const },
+                        take: 5,
+                    },
+                    notifications: {
+                        orderBy: { createdAt: 'desc' as const },
+                        take: 3,
+                        select: {
+                            id: true,
+                            title: true,
+                            body: true,
+                            isRead: true,
+                            createdAt: true,
                         },
                     },
                 },
             },
+        };
+
+        let parent = await this.prisma.parent.findUnique({
+            where: { userId: actor.id },
+            include: parentInclude,
         });
+
+        if (!parent) {
+            await this.prisma.parent.create({ data: { userId: actor.id } });
+            parent = await this.prisma.parent.findUnique({
+                where: { userId: actor.id },
+                include: parentInclude,
+            });
+        }
 
         if (!parent) {
             throw new NotFoundException('Parent profile not found for this account');
         }
 
-        // Enrich each student with summary stats
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+
+        const studentIds = parent.students.map((s) => s.id);
+        const activeByStudent = new Map<
+            string,
+            {
+                tripId: string;
+                name: string;
+                status: TripStatus;
+                currentStopName: string | null;
+                etaMinutes: number | null;
+                bus: { plateNumber: string; routeName: string };
+                latestLocation: {
+                    id: string;
+                    latitude: number;
+                    longitude: number;
+                    recordedAt: Date;
+                } | null;
+            }
+        >();
+
+        if (studentIds.length > 0) {
+            const activeTrips = await this.prisma.trip.findMany({
+                where: {
+                    status: TripStatus.IN_PROGRESS,
+                    tripDate: { gte: today, lt: tomorrow },
+                    attendances: { some: { studentId: { in: studentIds } } },
+                },
+                include: {
+                    attendances: {
+                        where: { studentId: { in: studentIds } },
+                        select: { studentId: true },
+                    },
+                    bus: { select: { plateNumber: true, routeName: true } },
+                    locations: { orderBy: { recordedAt: 'desc' }, take: 1 },
+                },
+            });
+
+            for (const trip of activeTrips) {
+                for (const a of trip.attendances) {
+                    if (!activeByStudent.has(a.studentId)) {
+                        activeByStudent.set(a.studentId, {
+                            tripId: trip.id,
+                            name: trip.name,
+                            status: trip.status,
+                            currentStopName: trip.currentStopName,
+                            etaMinutes: trip.etaMinutes,
+                            bus: trip.bus,
+                            latestLocation: trip.locations[0] ?? null,
+                        });
+                    }
+                }
+            }
+        }
+
         const children = parent.students.map((student) => {
             const totalMarked = student.attendances.length;
             const presentCount = student.attendances.filter(
@@ -196,6 +299,7 @@ export class DashboardService {
                 },
                 latestAttendance: latestRecord,
                 recentNotifications: student.notifications,
+                activeTrip: activeByStudent.get(student.id) ?? null,
             };
         });
 

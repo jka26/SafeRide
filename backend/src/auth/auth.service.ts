@@ -14,6 +14,19 @@ import { LoginDto } from './dto/login.dto';
 export class AuthService {
   constructor(private readonly prisma: PrismaService) { }
 
+  private async issueSession(userId: string) {
+    const token = randomUUID();
+    const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7);
+    await this.prisma.session.create({
+      data: {
+        token,
+        userId,
+        expiresAt,
+      },
+    });
+    return { token, expiresAt };
+  }
+
   async signUp(dto: SignUpDto) {
     const exists = await this.prisma.user.findUnique({
       where: { email: dto.email },
@@ -39,7 +52,13 @@ export class AuthService {
       },
     });
 
-    return user;
+    const { token, expiresAt } = await this.issueSession(user.id);
+
+    return {
+      token,
+      expiresAt,
+      user,
+    };
   }
 
   async login(dto: LoginDto) {
@@ -55,16 +74,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const token = randomUUID();
-    const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7);
-
-    await this.prisma.session.create({
-      data: {
-        token,
-        userId: user.id,
-        expiresAt,
-      },
-    });
+    const { token, expiresAt } = await this.issueSession(user.id);
 
     return {
       token,
