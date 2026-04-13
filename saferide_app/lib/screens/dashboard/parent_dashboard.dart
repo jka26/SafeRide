@@ -4,6 +4,7 @@ import '../../theme/app_theme.dart';
 import '../../providers/dashboard_provider.dart';
 import '../../models/notification_model.dart';
 import '../../notifications/notification_screen.dart';
+import '../../maps/live_map_screen.dart';
 import '../../shared/placeholder_screen.dart';
 
 class ParentDashboard extends StatelessWidget {
@@ -271,12 +272,7 @@ class _LiveTrackingCard extends StatelessWidget {
           const SizedBox(height: 14),
           GestureDetector(
             onTap: () => Navigator.of(context).push(MaterialPageRoute(
-              builder: (_) => const PlaceholderScreen(
-                title: 'Live Map',
-                subtitle: 'Real-time bus location will appear here once GPS tracking is connected.',
-                icon: Icons.map_rounded,
-                color: AppColors.primary,
-              ),
+              builder: (_) => const LiveMapScreen(),
             )),
             child: Container(
               width: double.infinity,
