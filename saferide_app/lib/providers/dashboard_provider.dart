@@ -7,6 +7,7 @@ import '../models/user_model.dart';
 import '../services/attendance_service.dart';
 import '../services/dashboard_service.dart';
 import '../services/notification_service.dart';
+import '../services/trip_service.dart';
 
 enum DashboardStatus { idle, loading, loaded, error }
 
@@ -15,13 +16,16 @@ class DashboardProvider extends ChangeNotifier {
     DashboardService? dashboardService,
     NotificationService? notificationService,
     AttendanceService? attendanceService,
+    TripService? tripService,
   })  : _dashboardService = dashboardService ?? DashboardService(),
         _notificationService = notificationService ?? NotificationService(),
-        _attendanceService = attendanceService ?? AttendanceService();
+        _attendanceService = attendanceService ?? AttendanceService(),
+        _tripService = tripService ?? TripService();
 
   final DashboardService _dashboardService;
   final NotificationService _notificationService;
   final AttendanceService _attendanceService;
+  final TripService _tripService;
   DashboardStatus _status = DashboardStatus.idle;
   String? _errorMessage;
 
@@ -127,8 +131,21 @@ class DashboardProvider extends ChangeNotifier {
   }
 
   // ── Driver actions ─────────────────────────────────────────
-  void toggleTrip() {
-    _tripStarted = !_tripStarted;
+  Future<void> toggleTrip() async {
+    final tripId = _activeTrip?.id;
+    if (tripId == null || tripId.isEmpty) return;
+
+    try {
+      if (_tripStarted) {
+        await _tripService.endTrip(tripId);
+      } else {
+        await _tripService.startTrip(tripId);
+      }
+      _tripStarted = !_tripStarted;
+      _errorMessage = null;
+    } catch (e) {
+      _errorMessage = e.toString();
+    }
     notifyListeners();
   }
 

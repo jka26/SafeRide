@@ -125,7 +125,7 @@ class _LoginScreenState extends State<LoginScreen>
                             width: 36,
                             height: 36,
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.12),
+                              color: Colors.white.withValues(alpha:0.12),
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: const Icon(
@@ -144,7 +144,7 @@ class _LoginScreenState extends State<LoginScreen>
                             fontFamily: 'Outfit',
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
-                            color: Colors.white.withOpacity(0.5),
+                            color: Colors.white.withValues(alpha:0.5),
                             letterSpacing: 1.5,
                           ),
                         ),
@@ -170,7 +170,7 @@ class _LoginScreenState extends State<LoginScreen>
                         //   style: TextStyle(
                         //     fontFamily: 'Outfit',
                         //     fontSize: 13,
-                        //     color: Colors.white.withOpacity(0.5),
+                        //     color: Colors.white.withValues(alpha:0.5),
                         //   ),
                         // ),
                       ],
@@ -491,7 +491,7 @@ class _SignInButtonState extends State<_SignInButton> {
             borderRadius: BorderRadius.circular(14),
             boxShadow: [
               BoxShadow(
-                color: AppColors.accent.withOpacity(0.35),
+                color: AppColors.accent.withValues(alpha:0.35),
                 blurRadius: 14,
                 offset: const Offset(0, 5),
               ),
@@ -534,9 +534,9 @@ class _ErrorBanner extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.error.withOpacity(0.08),
+        color: AppColors.error.withValues(alpha:0.08),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.error.withOpacity(0.25)),
+        border: Border.all(color: AppColors.error.withValues(alpha:0.25)),
       ),
       child: Row(
         children: [
