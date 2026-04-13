@@ -4,7 +4,7 @@ import '../../theme/app_theme.dart';
 import '../../providers/dashboard_provider.dart';
 import '../../models/student_model.dart';
 import '../../emergency/emergency_screen.dart';
-import '../../shared/placeholder_screen.dart';
+import '../../maps/route_map_screen.dart';
 
 class DriverDashboard extends StatelessWidget {
   const DriverDashboard({super.key});
@@ -455,10 +455,8 @@ class _QuickActions extends StatelessWidget {
           const SizedBox(height: 12),
           GestureDetector(
             onTap: () => Navigator.of(context).push(MaterialPageRoute(
-              builder: (_) => const PlaceholderScreen(
+              builder: (_) => const RouteMapScreen(
                 title: 'Full Route',
-                subtitle: 'The complete route map with all stops will appear here.',
-                icon: Icons.map_rounded,
                 color: AppColors.secondary,
               ),
             )),

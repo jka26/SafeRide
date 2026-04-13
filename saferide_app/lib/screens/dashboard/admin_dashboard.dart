@@ -5,7 +5,8 @@ import '../../providers/dashboard_provider.dart';
 import '../../models/bus_model.dart';
 import '../../admin/bus_students_screen.dart';
 import '../../admin/csv_upload_screen.dart';
-import '../../shared/placeholder_screen.dart';
+import '../../maps/fleet_map_screen.dart';
+import '../../maps/route_map_screen.dart';
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -97,7 +98,7 @@ class _AdminAppBar extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.15),
+                  color: Colors.white.withValues(alpha:0.15),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Row(children: [
@@ -216,12 +217,7 @@ class _FleetOverview extends StatelessWidget {
                   fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
               GestureDetector(
                 onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                  builder: (_) => const PlaceholderScreen(
-                    title: 'Fleet Map',
-                    subtitle: 'All active buses will appear on the live map here.',
-                    icon: Icons.map_rounded,
-                    color: Color(0xFF6D28D9),
-                  ),
+                  builder: (_) => FleetMapScreen(buses: buses),
                 )),
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -266,9 +262,9 @@ class _BusCard extends StatelessWidget {
 
   Color get _cardBg {
     switch (bus.status) {
-      case 'active': return AppColors.secondary.withOpacity(0.04);
-      case 'delayed': return AppColors.accent.withOpacity(0.05);
-      case 'completed': return AppColors.primaryLight.withOpacity(0.04);
+      case 'active': return AppColors.secondary.withValues(alpha:0.04);
+      case 'delayed': return AppColors.accent.withValues(alpha:0.05);
+      case 'completed': return AppColors.primaryLight.withValues(alpha:0.04);
       default: return Colors.white;
     }
   }
@@ -282,8 +278,8 @@ class _BusCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: _cardBg,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _statusColor.withOpacity(0.2)),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)],
+        border: Border.all(color: _statusColor.withValues(alpha:0.2)),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha:0.04), blurRadius: 6)],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -295,7 +291,7 @@ class _BusCard extends StatelessWidget {
                 Container(
                   width: 32, height: 32,
                   decoration: BoxDecoration(
-                    color: _statusColor.withOpacity(0.12),
+                    color: _statusColor.withValues(alpha:0.12),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(Icons.directions_bus_rounded, color: _statusColor, size: 18),
@@ -359,11 +355,10 @@ class _BusCard extends StatelessWidget {
           Row(children: [
             Expanded(child: GestureDetector(
               onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                builder: (_) => PlaceholderScreen(
+                builder: (_) => RouteMapScreen(
                   title: 'Tracking ${bus.busNumber}',
-                  subtitle: 'Live GPS location for ${bus.busNumber} on ${bus.routeName} will appear here.',
-                  icon: Icons.location_on_rounded,
                   color: _statusColor,
+                  bus: bus,
                 ),
               )),
               child: _BusActionButton(
@@ -406,7 +401,7 @@ class _BusActionButton extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha:0.3)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
