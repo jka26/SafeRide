@@ -45,6 +45,20 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Restore session from persisted token
+  Future<bool> tryRestoreSession() async {
+    try {
+      _currentUser = await _authService.me();
+      _selectedRole = _roleFromString(_currentUser?.role);
+      _status = AuthStatus.success;
+      notifyListeners();
+      return true;
+    } catch (_) {
+      await _authService.logout();
+      return false;
+    }
+  }
+
   // Email / Password login
   Future<void> loginWithEmail(String email, String password) async {
     _setLoading();
