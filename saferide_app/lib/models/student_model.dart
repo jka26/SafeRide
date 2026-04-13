@@ -1,3 +1,5 @@
+import 'trip_model.dart';
+
 class StudentModel {
   final String id;
   final String name;
