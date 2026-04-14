@@ -166,8 +166,20 @@ class _AdminDashboardState extends State<AdminDashboard>
       final drivers = await _adminOpsService.listDrivers();
       final buses = await _adminOpsService.listBuses();
       if (!mounted) return;
-      if (drivers.isEmpty || buses.isEmpty) {
-        throw Exception('Need at least one driver and one bus to assign.');
+      if (buses.isEmpty && drivers.isEmpty) {
+        throw Exception(
+          'Add at least one bus (Create Bus) and one driver account first.',
+        );
+      }
+      if (buses.isEmpty) {
+        throw Exception(
+          'No buses yet. Tap Create Bus and add plate, route, and capacity.',
+        );
+      }
+      if (drivers.isEmpty) {
+        throw Exception(
+          'No driver accounts found. Sign up a user with the Driver role, then try again.',
+        );
       }
 
       String selectedDriverId = drivers.first.id;

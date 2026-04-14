@@ -30,18 +30,16 @@ class AdminOpsService {
   final ApiClient _apiClient;
 
   Future<List<AdminDriverOption>> listDrivers() async {
-    final response = await _apiClient.get('/users') as List<dynamic>;
+    // GET /drivers: Driver rows + user; backend creates missing Driver profiles for DRIVER users.
+    final response = await _apiClient.get('/drivers') as List<dynamic>;
     return response
         .cast<Map<String, dynamic>>()
-        .where((u) => (u['role'] ?? '').toString().toUpperCase() == 'DRIVER')
-        .map((u) {
-          final driver = u['driver'] as Map<String, dynamic>?;
-          // Trip.driverId references Driver.id, not User.id.
-          final profileId = (driver?['id'] ?? '').toString();
+        .map((row) {
+          final user = row['user'] as Map<String, dynamic>?;
           return AdminDriverOption(
-            id: profileId,
-            fullName: (u['fullName'] ?? 'Unnamed driver').toString(),
-            email: (u['email'] ?? '').toString(),
+            id: (row['id'] ?? '').toString(),
+            fullName: (user?['fullName'] ?? 'Unnamed driver').toString(),
+            email: (user?['email'] ?? '').toString(),
           );
         })
         .where((d) => d.id.isNotEmpty)

@@ -44,6 +44,7 @@ class _CsvUploadBody extends StatelessWidget {
       body: provider.isSuccess
           ? _SuccessView(
               count: provider.uploadedCount,
+              skipped: provider.skippedCount,
               routeName: '',
               onUploadAnother: () => context.read<CsvUploadProvider>().reset(),
             )
@@ -530,17 +531,43 @@ class _PreviewStudentTile extends StatelessWidget {
 
 class _SuccessView extends StatelessWidget {
   final int count;
+  final int skipped;
   final String routeName;
   final VoidCallback onUploadAnother;
 
   const _SuccessView({
     required this.count,
+    required this.skipped,
     required this.routeName,
     required this.onUploadAnother,
   });
 
   @override
   Widget build(BuildContext context) {
+    final String detail;
+    if (count == 0 && skipped == 0) {
+      detail =
+          'No data rows were imported. Check that your CSV has a header row '
+          'and columns the app recognizes for student code, name, and grade '
+          '(e.g. studentCode, fullName, grade).';
+    } else if (count == 0 && skipped > 0) {
+      detail =
+          'No new students were added. All $skipped row${skipped != 1 ? "s" : ""} '
+          'use student codes that already exist in the database. '
+          'Change codes in the file or remove existing students first.';
+    } else if (skipped > 0) {
+      detail =
+          routeName.isEmpty
+              ? '$count new student${count != 1 ? "s" : ""} added. '
+                    '$skipped row${skipped != 1 ? "s" : ""} skipped (duplicate student codes).'
+              : '$count new student${count != 1 ? "s" : ""} added to $routeName. '
+                    '$skipped skipped (duplicate codes).';
+    } else {
+      detail = routeName.isEmpty
+          ? '$count student${count != 1 ? "s" : ""} have been added.'
+          : '$count student${count != 1 ? "s" : ""} have been added to $routeName.';
+    }
+
     return Padding(
       padding: const EdgeInsets.all(32),
       child: Column(
@@ -552,23 +579,33 @@ class _SuccessView extends StatelessWidget {
               color: AppColors.secondary.withOpacity(0.1),
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.check_circle_rounded,
-                color: AppColors.secondary, size: 44),
+            child: Icon(
+              count == 0 && skipped == 0
+                  ? Icons.warning_amber_rounded
+                  : Icons.check_circle_rounded,
+              color: count == 0 && skipped == 0
+                  ? AppColors.accent
+                  : AppColors.secondary,
+              size: 44,
+            ),
           ),
           const SizedBox(height: 20),
-          const Text('Upload Successful',
-            style: TextStyle(fontFamily: 'Outfit', fontSize: 22,
-              fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+          Text(
+            count == 0 && skipped == 0
+                ? 'Nothing imported'
+                : 'Upload finished',
+            style: const TextStyle(fontFamily: 'Outfit', fontSize: 22,
+              fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+          ),
           const SizedBox(height: 10),
           Text(
-            routeName.isEmpty
-                ? '$count student${count != 1 ? "s" : ""} have been added.'
-                : '$count student${count != 1 ? "s" : ""} have been added to $routeName.',
+            detail,
             textAlign: TextAlign.center,
             style: const TextStyle(fontFamily: 'Outfit', fontSize: 14,
               color: AppColors.textSecondary, height: 1.6)),
           const SizedBox(height: 8),
-          Container(
+          if (count > 0)
+            Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: BoxDecoration(
               color: AppColors.secondary.withOpacity(0.08),

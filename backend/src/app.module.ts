@@ -15,6 +15,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { RoutesModule } from './routes/routes.module';
 import { ParentsModule } from './parents/parents.module';
 import { OnboardingModule } from './onboarding/onboarding.module';
+import { DriversModule } from './drivers/drivers.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { OnboardingModule } from './onboarding/onboarding.module';
     RoutesModule,
     ParentsModule,
     OnboardingModule,
+    DriversModule,
   ],
   controllers: [AppController],
   providers: [],
