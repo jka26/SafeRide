@@ -42,8 +42,11 @@ class BusModel {
     final countMap = (json['_count'] ?? const <String, dynamic>{}) as Map<String, dynamic>;
     final attendanceCount = (countMap['attendances'] as num?)?.toInt() ?? 0;
 
+    // Trip id is json['id']; bus id must be used for /buses/:id/students (not trip id).
+    final busId =
+        (bus['id'] ?? json['busId'] ?? '').toString();
     return BusModel(
-      id: (json['id'] ?? '').toString(),
+      id: busId,
       tripId: (json['id'] ?? '').toString(),
       busNumber: (bus['plateNumber'] ?? '--').toString(),
       routeName: (bus['routeName'] ?? '--').toString(),

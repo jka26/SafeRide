@@ -104,23 +104,6 @@ export class OnboardingService {
       select: { id: true },
     });
 
-    const bus = await this.prisma.bus.upsert({
-      where: { plateNumber: dto.busNumber.trim() },
-      update: {
-        routeName: dto.routeName.trim(),
-      },
-      create: {
-        plateNumber: dto.busNumber.trim(),
-        routeName: dto.routeName.trim(),
-        capacity: 40,
-      },
-      select: {
-        id: true,
-        plateNumber: true,
-        routeName: true,
-      },
-    });
-
     await this.prisma.user.update({
       where: { id: actor.id },
       data: { onboardingCompleted: true },
@@ -128,7 +111,6 @@ export class OnboardingService {
 
     return {
       message: 'Driver onboarding completed',
-      bus,
       emergencyContact: {
         name: dto.emergencyContactName.trim(),
         phone: dto.emergencyContactPhone.trim(),

@@ -15,6 +15,7 @@ export class UsersService {
         role: true,
         fullName: true,
         createdAt: true,
+        driver: { select: { id: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
