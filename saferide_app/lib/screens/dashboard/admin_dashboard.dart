@@ -8,6 +8,7 @@ import '../../admin/csv_upload_screen.dart';
 import '../../maps/fleet_map_screen.dart';
 import '../../maps/route_map_screen.dart';
 import '../../ui/app_motion.dart';
+import '../../services/admin_ops_service.dart';
 import '../../widgets/logout_button.dart';
 
 class AdminDashboard extends StatefulWidget {
@@ -20,6 +21,7 @@ class AdminDashboard extends StatefulWidget {
 class _AdminDashboardState extends State<AdminDashboard>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  final AdminOpsService _adminOpsService = AdminOpsService();
 
   @override
   void initState() {
@@ -51,7 +53,11 @@ class _AdminDashboardState extends State<AdminDashboard>
       ),
       body: Column(
         children: [
-          _AdminAppBar(tabController: _tabController),
+          _AdminAppBar(
+            tabController: _tabController,
+            onCreateBus: _showCreateBusDialog,
+            onAssignBusToDriver: _showAssignBusToDriverDialog,
+          ),
           _StatsRow(dashboard: dashboard),
           Expanded(
             child: TabBarView(
@@ -81,11 +87,223 @@ class _AdminDashboardState extends State<AdminDashboard>
       ),
     );
   }
+
+  Future<void> _showCreateBusDialog() async {
+    final plateCtrl = TextEditingController();
+    final routeCtrl = TextEditingController();
+    final capacityCtrl = TextEditingController(text: '40');
+    try {
+      final created = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Create Bus'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: plateCtrl,
+                decoration: const InputDecoration(labelText: 'Plate number'),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: routeCtrl,
+                decoration: const InputDecoration(labelText: 'Route name'),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: capacityCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Capacity'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Create'),
+            ),
+          ],
+        ),
+      );
+      if (created != true) return;
+
+      final plate = plateCtrl.text.trim();
+      final route = routeCtrl.text.trim();
+      final capacity = int.tryParse(capacityCtrl.text.trim()) ?? 40;
+      if (plate.isEmpty || route.isEmpty) {
+        throw Exception('Plate number and route name are required.');
+      }
+
+      await _adminOpsService.createBus(
+        plateNumber: plate,
+        routeName: route,
+        capacity: capacity,
+      );
+      if (!mounted) return;
+      await context.read<DashboardProvider>().loadDashboard('admin');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Bus created successfully.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString())),
+      );
+    } finally {
+      plateCtrl.dispose();
+      routeCtrl.dispose();
+      capacityCtrl.dispose();
+    }
+  }
+
+  Future<void> _showAssignBusToDriverDialog() async {
+    try {
+      final drivers = await _adminOpsService.listDrivers();
+      final buses = await _adminOpsService.listBuses();
+      if (!mounted) return;
+      if (drivers.isEmpty || buses.isEmpty) {
+        throw Exception('Need at least one driver and one bus to assign.');
+      }
+
+      String selectedDriverId = drivers.first.id;
+      String selectedBusId = buses.first.id;
+      final tripNameCtrl = TextEditingController(text: 'Morning Route');
+      DateTime selectedDate = DateTime.now();
+
+      final shouldCreate = await showDialog<bool>(
+        context: context,
+        builder: (context) => StatefulBuilder(
+          builder: (context, setStateDialog) => AlertDialog(
+            title: const Text('Assign Bus to Driver'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<String>(
+                  value: selectedDriverId,
+                  isExpanded: true,
+                  decoration: const InputDecoration(labelText: 'Driver'),
+                  items: drivers
+                      .map(
+                        (d) => DropdownMenuItem(
+                          value: d.id,
+                          child: Text(d.fullName),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) {
+                    if (value == null) return;
+                    setStateDialog(() => selectedDriverId = value);
+                  },
+                ),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  value: selectedBusId,
+                  isExpanded: true,
+                  decoration: const InputDecoration(labelText: 'Bus'),
+                  items: buses
+                      .map(
+                        (b) => DropdownMenuItem(
+                          value: b.id,
+                          child: Text('${b.plateNumber} • ${b.routeName}'),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) {
+                    if (value == null) return;
+                    setStateDialog(() => selectedBusId = value);
+                  },
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: tripNameCtrl,
+                  decoration: const InputDecoration(labelText: 'Trip name'),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Date: ${selectedDate.toLocal().toString().split(' ').first}',
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: selectedDate,
+                          firstDate: DateTime.now().subtract(const Duration(days: 1)),
+                          lastDate: DateTime.now().add(const Duration(days: 365)),
+                        );
+                        if (picked == null) return;
+                        setStateDialog(() => selectedDate = picked);
+                      },
+                      child: const Text('Change'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('Assign'),
+              ),
+            ],
+          ),
+        ),
+      );
+
+      if (shouldCreate != true) {
+        tripNameCtrl.dispose();
+        return;
+      }
+
+      final tripName = tripNameCtrl.text.trim();
+      tripNameCtrl.dispose();
+      if (tripName.isEmpty) {
+        throw Exception('Trip name is required.');
+      }
+
+      await _adminOpsService.createTripAssignment(
+        name: tripName,
+        busId: selectedBusId,
+        driverId: selectedDriverId,
+        tripDate: selectedDate,
+      );
+
+      if (!mounted) return;
+      await context.read<DashboardProvider>().loadDashboard('admin');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Bus assigned to driver successfully.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString())),
+      );
+    }
+  }
 }
 
 class _AdminAppBar extends StatelessWidget {
   final TabController tabController;
-  const _AdminAppBar({required this.tabController});
+  final Future<void> Function() onCreateBus;
+  final Future<void> Function() onAssignBusToDriver;
+  const _AdminAppBar({
+    required this.tabController,
+    required this.onCreateBus,
+    required this.onAssignBusToDriver,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -132,6 +350,30 @@ class _AdminAppBar extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
+          Row(
+            children: [
+              TextButton.icon(
+                onPressed: () {
+                  onCreateBus();
+                },
+                icon: const Icon(Icons.add_road_rounded, color: Colors.white, size: 16),
+                label: const Text(
+                  'Create Bus',
+                  style: TextStyle(color: Colors.white, fontFamily: 'Outfit'),
+                ),
+              ),
+              TextButton.icon(
+                onPressed: () {
+                  onAssignBusToDriver();
+                },
+                icon: const Icon(Icons.assignment_ind_rounded, color: Colors.white, size: 16),
+                label: const Text(
+                  'Assign Driver',
+                  style: TextStyle(color: Colors.white, fontFamily: 'Outfit'),
+                ),
+              ),
+            ],
+          ),
           TabBar(
             controller: tabController,
             labelColor: Colors.white,
@@ -371,34 +613,64 @@ class _BusCard extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Row(children: [
-            Expanded(child: TapScale(
-              onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                builder: (_) => RouteMapScreen(
-                  title: 'Tracking ${bus.busNumber}',
+            Expanded(
+              child: TapScale(
+                onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => RouteMapScreen(
+                    title: 'Tracking ${bus.busNumber}',
+                    color: _statusColor,
+                    tripId: bus.tripId,
+                    bus: bus,
+                  ),
+                )),
+                child: _BusActionButton(
+                  icon: Icons.location_on_rounded,
+                  label: 'Track',
                   color: _statusColor,
-                  tripId: bus.tripId,
-                  bus: bus,
                 ),
-              )),
-              child: _BusActionButton(
-                icon: Icons.location_on_rounded,
-                label: 'Track',
-                color: _statusColor,
               ),
-            )),
+            ),
             const SizedBox(width: 8),
-            Expanded(child: TapScale(
+            Expanded(
+              child: TapScale(
+                onTap: () async {
+                  try {
+                    final students =
+                        await context.read<DashboardProvider>().getBusStudents(bus.id);
+                    if (!context.mounted) return;
+                    Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) => BusStudentsScreen(
+                        bus: bus,
+                        students: students,
+                      ),
+                    ));
+                  } catch (e) {
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(e.toString())),
+                    );
+                  }
+                },
+                child: _BusActionButton(
+                  icon: Icons.people_rounded,
+                  label: 'Students',
+                  color: _statusColor,
+                ),
+              ),
+            ),
+          ]),
+          if (bus.tripId.isNotEmpty && bus.status == 'idle') ...[
+            const SizedBox(height: 8),
+            TapScale(
               onTap: () async {
                 try {
-                  final students =
-                      await context.read<DashboardProvider>().getBusStudents(bus.id);
+                  await AdminOpsService().startTrip(bus.tripId);
                   if (!context.mounted) return;
-                  Navigator.of(context).push(MaterialPageRoute(
-                    builder: (_) => BusStudentsScreen(
-                      bus: bus,
-                      students: students,
-                    ),
-                  ));
+                  await context.read<DashboardProvider>().loadDashboard('admin');
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Started trip for ${bus.busNumber}.')),
+                  );
                 } catch (e) {
                   if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -407,12 +679,12 @@ class _BusCard extends StatelessWidget {
                 }
               },
               child: _BusActionButton(
-                icon: Icons.people_rounded,
-                label: 'Students',
-                color: _statusColor,
+                icon: Icons.play_arrow_rounded,
+                label: 'Start Trip',
+                color: AppColors.primaryLight,
               ),
-            )),
-          ]),
+            ),
+          ],
         ],
       ),
     );

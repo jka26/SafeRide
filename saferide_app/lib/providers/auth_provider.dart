@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../api/api_client.dart';
 import '../api/session_store.dart';
+import '../services/push_notification_service.dart';
 
 enum UserRole { parent, driver, admin }
 
@@ -48,6 +49,7 @@ class AuthProvider extends ChangeNotifier {
   AuthProvider({ApiClient? apiClient}) : _apiClient = apiClient ?? ApiClient();
 
   final ApiClient _apiClient;
+  final PushNotificationService _pushService = PushNotificationService();
 
   AuthStatus _status = AuthStatus.idle;
   String? _errorMessage;
@@ -77,6 +79,8 @@ class AuthProvider extends ChangeNotifier {
       final body = await _apiClient.get('/auth/me') as Map<String, dynamic>;
       _currentUser = AuthenticatedUser.fromJson(body);
       _sessionToken = saved;
+      await _pushService.initialize();
+      await _pushService.syncDeviceToken();
       _status = AuthStatus.success;
       notifyListeners();
       return true;
@@ -117,6 +121,8 @@ class AuthProvider extends ChangeNotifier {
       _currentUser = AuthenticatedUser.fromJson(userData);
       if (_sessionToken != null && _sessionToken!.isNotEmpty) {
         SessionStore.instance.token = _sessionToken;
+        await _pushService.initialize();
+        await _pushService.syncDeviceToken();
       }
       _status = AuthStatus.success;
       _errorMessage = null;
@@ -162,6 +168,8 @@ class AuthProvider extends ChangeNotifier {
       _currentUser = AuthenticatedUser.fromJson(userData);
       if (_sessionToken != null && _sessionToken!.isNotEmpty) {
         SessionStore.instance.token = _sessionToken;
+        await _pushService.initialize();
+        await _pushService.syncDeviceToken();
       }
       _status = AuthStatus.success;
       _errorMessage = null;

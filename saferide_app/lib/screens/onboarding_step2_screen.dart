@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import '../../theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
@@ -47,7 +48,28 @@ class _OnboardingStep2ScreenState extends State<OnboardingStep2Screen>
     required TextEditingController phoneController,
   }) async {
     try {
-      final hasPermission = await FlutterContacts.requestPermission();
+      final permissionStatus = await Permission.contacts.request();
+      if (permissionStatus.isPermanentlyDenied) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text(
+                'Contacts permission is permanently denied. Enable it in settings.',
+              ),
+              action: SnackBarAction(
+                label: 'Settings',
+                onPressed: () {
+                  openAppSettings();
+                },
+              ),
+            ),
+          );
+        }
+        return;
+      }
+
+      final hasPermission = permissionStatus.isGranted ||
+          await FlutterContacts.requestPermission(readonly: true);
       if (!hasPermission) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

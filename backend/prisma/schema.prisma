@@ -39,6 +39,7 @@ model User {
   sessions     Session[]
   parent       Parent?
   driver       Driver?
+  deviceTokens DeviceToken[]
 }
 
 model Session {
@@ -154,4 +155,16 @@ model Notification {
   targetRole  Role?
   isRead      Boolean  @default(false)
   createdAt   DateTime @default(now())
+}
+
+model DeviceToken {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token      String   @unique
+  platform   String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([userId])
 }

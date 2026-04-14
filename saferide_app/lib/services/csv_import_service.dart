@@ -4,10 +4,12 @@ import '../models/csv_student_model.dart';
 class CsvPreviewResult {
   CsvPreviewResult({
     required this.totalRows,
+    required this.previewCount,
     required this.rows,
   });
 
   final int totalRows;
+  final int previewCount;
   final List<CsvStudentModel> rows;
 }
 
@@ -20,12 +22,16 @@ class CsvImportService {
   Future<CsvPreviewResult> preview(String csvText) async {
     final response = await _apiClient.post(
       '/csv-import/students/preview',
-      body: {'csvText': csvText},
+      body: {
+        'csvText': csvText,
+        'previewLimit': 200,
+      },
     ) as Map<String, dynamic>;
 
     final rows = (response['rows'] ?? []) as List<dynamic>;
     return CsvPreviewResult(
       totalRows: (response['totalRows'] as num?)?.toInt() ?? rows.length,
+      previewCount: (response['previewCount'] as num?)?.toInt() ?? rows.length,
       rows: rows
           .map((item) => CsvStudentModel.fromBackendRow(item as Map<String, dynamic>))
           .toList(),
