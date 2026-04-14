@@ -102,4 +102,22 @@ export class ParentsService {
       },
     });
   }
+
+  async findByCode(studentCode: string) {
+    const student = await this.prisma.student.findUnique({
+      where: { studentCode },
+      select: {
+        id: true,
+        studentCode: true,
+        fullName: true,
+        grade: true,
+        routeName: true,
+        busLabel: true,
+        parentId: true,
+      },
+    });
+    if (!student) throw new NotFoundException(`No student found with code ${studentCode}`);
+    if (student.parentId) throw new ConflictException('This student is already linked to a parent');
+    return student;
+  }
 }

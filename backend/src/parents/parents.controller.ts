@@ -4,6 +4,7 @@ import { Roles } from '../common/auth/roles.decorator';
 import { AppRole } from '../common/auth/roles.enum';
 import { CurrentUser } from '../common/auth/current-user.decorator';
 import type { AuthenticatedUser } from '../common/auth/authenticated-user.interface';
+import { Query } from '@nestjs/common';
 
 @Controller('parents')
 @Roles(AppRole.PARENT)
@@ -13,6 +14,11 @@ export class ParentsController {
   @Get('me')
   me(@CurrentUser() user: AuthenticatedUser) {
     return this.parentsService.getMe(user);
+  }
+
+  @Get('me/students/search')
+  findByCode(@Query('code') code: string) {
+    return this.parentsService.findByCode(code);
   }
 
   @Post('me/students/:studentId')
