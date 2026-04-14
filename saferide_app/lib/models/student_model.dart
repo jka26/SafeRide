@@ -60,14 +60,19 @@ class StudentModel {
 
   factory StudentModel.fromParentDashboard(Map<String, dynamic> json) {
     final latestAttendance = json['latestAttendance'] as Map<String, dynamic>?;
+    final activeTrip = json['activeTrip'] as Map<String, dynamic>?;
     return StudentModel(
       id: (json['id'] ?? '').toString(),
       name: (json['fullName'] ?? '').toString(),
       grade: (json['grade'] ?? '').toString(),
+      stopName: (json['stopName'] as String?)?.trim(),
+      dropOffTime: (json['dropOffTime'] as String?)?.trim(),
       status: _statusFromAttendance(latestAttendance?['status']),
-      latestTrip: latestAttendance == null
-          ? null
-          : TripModel.fromParentAttendance(latestAttendance),
+      latestTrip: activeTrip != null
+          ? TripModel.fromParentActiveTrip(activeTrip)
+          : (latestAttendance == null
+              ? null
+              : TripModel.fromParentAttendance(latestAttendance)),
     );
   }
 
@@ -81,10 +86,24 @@ class StudentModel {
     );
   }
 
+  factory StudentModel.fromBusRoster(Map<String, dynamic> json) {
+    return StudentModel(
+      id: (json['id'] ?? '').toString(),
+      name: (json['fullName'] ?? '').toString(),
+      grade: (json['grade'] ?? '').toString(),
+      stopName: (json['stopName'] ?? '').toString(),
+      dropOffTime: (json['dropOffTime'] ?? '').toString(),
+      status: _statusFromAttendance(json['attendanceStatus']),
+    );
+  }
+
   static String _statusFromAttendance(dynamic status) {
     switch ((status ?? '').toString().toUpperCase()) {
       case 'PRESENT':
+      case 'BOARDED':
         return 'boarded';
+      case 'ALIGHTED':
+        return 'alighted';
       case 'ABSENT':
         return 'absent';
       default:

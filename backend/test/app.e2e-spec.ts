@@ -5,6 +5,8 @@ import {
 } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
+import { PrismaClient } from '@prisma/client';
+import * as bcrypt from 'bcryptjs';
 import { AppModule } from './../src/app.module';
 import { AllExceptionsFilter } from './../src/common/filters/all-exceptions.filter';
 
@@ -18,6 +20,7 @@ import { AllExceptionsFilter } from './../src/common/filters/all-exceptions.filt
  */
 describe('SafeRide API (e2e)', () => {
   let app: INestApplication<App>;
+  const prisma = new PrismaClient();
   let adminToken: string;
   let driverToken: string;
   let parentToken: string;
@@ -51,6 +54,7 @@ describe('SafeRide API (e2e)', () => {
   });
 
   afterAll(async () => {
+    await prisma.$disconnect();
     await app.close();
   });
 
@@ -77,14 +81,11 @@ describe('SafeRide API (e2e)', () => {
     const parentEmail = `parent_e2e_${Date.now()}@test.com`;
     const password = 'TestPass123!';
 
-    it('POST /api/auth/signup — creates admin account and returns session', async () => {
-      const res = await request(app.getHttpServer())
+    it('POST /api/auth/signup — rejects ADMIN public signup', async () => {
+      await request(app.getHttpServer())
         .post('/api/auth/signup')
         .send({ email: adminEmail, password, fullName: 'E2E Admin', role: 'ADMIN' })
-        .expect(201);
-      expect(res.body.token).toBeDefined();
-      expect(res.body.expiresAt).toBeDefined();
-      expect(res.body.user.email).toBe(adminEmail);
+        .expect(400);
     });
 
     it('POST /api/auth/signup — creates driver account with session', async () => {
@@ -104,6 +105,22 @@ describe('SafeRide API (e2e)', () => {
     });
 
     it('POST /api/auth/login — logs in admin and returns token', async () => {
+      const passwordHash = await bcrypt.hash(password, 10);
+      await prisma.user.upsert({
+        where: { email: adminEmail },
+        update: {
+          passwordHash,
+          fullName: 'E2E Admin',
+          role: 'ADMIN',
+        },
+        create: {
+          email: adminEmail,
+          passwordHash,
+          fullName: 'E2E Admin',
+          role: 'ADMIN',
+        },
+      });
+
       const res = await request(app.getHttpServer())
         .post('/api/auth/login')
         .send({ email: adminEmail, password })
@@ -153,11 +170,11 @@ describe('SafeRide API (e2e)', () => {
       const res = await request(app.getHttpServer())
         .post('/api/auth/login')
         .send({ email: adminEmail, password: 'bad' })
-        .expect(401);
+        .expect(400);
       expect(res.body).toMatchObject({
-        statusCode: 401,
+        statusCode: 400,
         error: expect.any(String),
-        message: expect.any(String),
+        message: expect.any(Array),
         timestamp: expect.any(String),
         path: '/api/auth/login',
       });
@@ -541,9 +558,21 @@ describe('SafeRide API (e2e)', () => {
 
       // Create a fresh user and log them in
       const email = `logout_e2e_${Date.now()}@test.com`;
-      await request(app.getHttpServer())
-        .post('/api/auth/signup')
-        .send({ email, password: 'TestPass123!', fullName: 'Logout Test', role: 'ADMIN' });
+      const passwordHash = await bcrypt.hash('TestPass123!', 10);
+      await prisma.user.upsert({
+        where: { email },
+        update: {
+          passwordHash,
+          fullName: 'Logout Test',
+          role: 'ADMIN',
+        },
+        create: {
+          email,
+          passwordHash,
+          fullName: 'Logout Test',
+          role: 'ADMIN',
+        },
+      });
       const res = await request(app.getHttpServer())
         .post('/api/auth/login')
         .send({ email, password: 'TestPass123!' })

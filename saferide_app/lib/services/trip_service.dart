@@ -12,4 +12,18 @@ class TripService {
   Future<void> endTrip(String tripId) async {
     await _apiClient.post('/driver/trips/$tripId/end');
   }
+
+  Future<void> reportLocation({
+    required String tripId,
+    required double latitude,
+    required double longitude,
+  }) async {
+    await _apiClient.post(
+      '/driver/trips/$tripId/location',
+      body: {
+        'latitude': latitude,
+        'longitude': longitude,
+      },
+    );
+  }
 }

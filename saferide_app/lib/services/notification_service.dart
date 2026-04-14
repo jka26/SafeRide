@@ -17,4 +17,27 @@ class NotificationService {
   Future<void> markRead(String id) async {
     await _apiClient.patch('/notifications/$id/read');
   }
+
+  Future<int> getUnreadCount() async {
+    final response =
+        await _apiClient.get('/notifications/unread-count') as Map<String, dynamic>;
+    return (response['unreadCount'] as num?)?.toInt() ?? 0;
+  }
+
+  Future<void> reportEmergency({
+    required String type,
+    String? tripId,
+    double? latitude,
+    double? longitude,
+  }) async {
+    await _apiClient.post(
+      '/notifications/emergency',
+      body: {
+        'type': type,
+        if (tripId != null && tripId.isNotEmpty) 'tripId': tripId,
+        if (latitude != null) 'latitude': latitude,
+        if (longitude != null) 'longitude': longitude,
+      },
+    );
+  }
 }

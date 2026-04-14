@@ -5,6 +5,7 @@ import '../../providers/dashboard_provider.dart';
 import '../../models/student_model.dart';
 import '../../emergency/emergency_screen.dart';
 import '../../maps/route_map_screen.dart';
+import '../../ui/app_motion.dart';
 import '../../widgets/logout_button.dart';
 
 class DriverDashboard extends StatelessWidget {
@@ -13,33 +14,53 @@ class DriverDashboard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dashboard = context.watch<DashboardProvider>();
+    final trip = dashboard.activeTrip;
 
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Column(
         children: [
-          _DriverAppBar(user: dashboard.currentUser),
+          _DriverAppBar(
+            user: dashboard.currentUser,
+            busNumber: trip?.busNumber ?? '--',
+            routeName: trip?.routeName ?? '--',
+          ),
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _TripStatusCard(
-                    tripStarted: dashboard.tripStarted,
-                    onToggle: () => context.read<DashboardProvider>().toggleTrip(),
-                    // toggleTrip is async — fire-and-forget is intentional here
+                  FadeSlideIn(
+                    child: _TripStatusCard(
+                      tripStarted: dashboard.tripStarted,
+                      tripStatus: trip?.status ?? 'idle',
+                      canToggle: trip != null,
+                      onToggle: () => context.read<DashboardProvider>().toggleTrip(),
+                    ),
                   ),
                   const SizedBox(height: 14),
-                  _StatsRow(
-                    checkedIn: dashboard.checkedIn,
-                    pending: dashboard.pending,
-                    absent: dashboard.absent,
+                  FadeSlideIn(
+                    delay: const Duration(milliseconds: 80),
+                    child: _StatsRow(
+                      checkedIn: dashboard.checkedIn,
+                      pending: dashboard.pending,
+                      absent: dashboard.absent,
+                    ),
                   ),
                   const SizedBox(height: 14),
-                  _StudentList(students: dashboard.students),
+                  FadeSlideIn(
+                    delay: const Duration(milliseconds: 140),
+                    child: _StudentList(students: dashboard.students),
+                  ),
                   const SizedBox(height: 14),
-                  _QuickActions(),
+                  FadeSlideIn(
+                    delay: Duration(milliseconds: 180),
+                    child: _QuickActions(
+                      tripId: trip?.id,
+                      hasTrip: trip != null,
+                    ),
+                  ),
                   const SizedBox(height: 16),
                 ],
               ),
@@ -53,7 +74,13 @@ class DriverDashboard extends StatelessWidget {
 
 class _DriverAppBar extends StatelessWidget {
   final user;
-  const _DriverAppBar({required this.user});
+  final String busNumber;
+  final String routeName;
+  const _DriverAppBar({
+    required this.user,
+    required this.busNumber,
+    required this.routeName,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -85,12 +112,12 @@ class _DriverAppBar extends StatelessWidget {
               color: Colors.white.withValues(alpha:0.15),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Column(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Text('Bus B-42', style: TextStyle(fontFamily: 'Outfit', fontSize: 12,
+                Text('Bus $busNumber', style: const TextStyle(fontFamily: 'Outfit', fontSize: 12,
                   fontWeight: FontWeight.w700, color: Colors.white)),
-                Text('Route North', style: TextStyle(fontFamily: 'Outfit', fontSize: 10, color: Colors.white70)),
+                Text(routeName, style: const TextStyle(fontFamily: 'Outfit', fontSize: 10, color: Colors.white70)),
               ],
             ),
           ),
@@ -104,8 +131,15 @@ class _DriverAppBar extends StatelessWidget {
 
 class _TripStatusCard extends StatelessWidget {
   final bool tripStarted;
+  final String tripStatus;
+  final bool canToggle;
   final VoidCallback onToggle;
-  const _TripStatusCard({required this.tripStarted, required this.onToggle});
+  const _TripStatusCard({
+    required this.tripStarted,
+    required this.tripStatus,
+    required this.canToggle,
+    required this.onToggle,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -122,15 +156,17 @@ class _TripStatusCard extends StatelessWidget {
           const Text('Trip Status',
             style: TextStyle(fontFamily: 'Outfit', fontSize: 15,
               fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-          const Text('Afternoon Route',
-            style: TextStyle(fontFamily: 'Outfit', fontSize: 12, color: AppColors.textSecondary)),
+          Text('Trip status: ${tripStatus.toUpperCase()}',
+            style: const TextStyle(fontFamily: 'Outfit', fontSize: 12, color: AppColors.textSecondary)),
           const SizedBox(height: 14),
-          GestureDetector(
-            onTap: onToggle,
+          TapScale(
+            onTap: canToggle ? onToggle : null,
             child: Container(
               width: double.infinity, height: 48,
               decoration: BoxDecoration(
-                color: tripStarted ? AppColors.error : AppColors.secondary,
+                color: canToggle
+                    ? (tripStarted ? AppColors.error : AppColors.secondary)
+                    : AppColors.textHint,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
@@ -146,6 +182,18 @@ class _TripStatusCard extends StatelessWidget {
               ),
             ),
           ),
+          if (!canToggle)
+            const Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: Text(
+                'No current trip assignment.',
+                style: TextStyle(
+                  fontFamily: 'Outfit',
+                  fontSize: 11,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -347,7 +395,7 @@ class _StudentRow extends StatelessWidget {
             const SizedBox(height: 10),
             const Divider(color: AppColors.divider, height: 1),
             const SizedBox(height: 8),
-            GestureDetector(
+            TapScale(
               onTap: () => context
                   .read<DashboardProvider>()
                   .updateStudentStatus(student.id, 'pending'),
@@ -415,7 +463,7 @@ class _ToggleButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return TapScale(
       onTap: onTap,
       child: Container(
         height: 36,
@@ -441,6 +489,11 @@ class _ToggleButton extends StatelessWidget {
 // Quick actions
 
 class _QuickActions extends StatelessWidget {
+  final String? tripId;
+  final bool hasTrip;
+
+  const _QuickActions({required this.tripId, required this.hasTrip});
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -457,13 +510,16 @@ class _QuickActions extends StatelessWidget {
             style: TextStyle(fontFamily: 'Outfit', fontSize: 15,
               fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
           const SizedBox(height: 12),
-          GestureDetector(
-            onTap: () => Navigator.of(context).push(MaterialPageRoute(
-              builder: (_) => const RouteMapScreen(
-                title: 'Full Route',
-                color: AppColors.secondary,
-              ),
-            )),
+          TapScale(
+            onTap: !hasTrip || tripId == null
+                ? null
+                : () => Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) => RouteMapScreen(
+                        title: 'Full Route',
+                        color: AppColors.secondary,
+                        tripId: tripId!,
+                      ),
+                    )),
             child: const _ActionRow(
               icon: Icons.map_rounded,
               label: 'View Full Route',
@@ -471,7 +527,7 @@ class _QuickActions extends StatelessWidget {
             ),
           ),
           const Divider(color: AppColors.divider, height: 1),
-          GestureDetector(
+          TapScale(
             onTap: () => Navigator.of(context).push(MaterialPageRoute(
               builder: (_) => const EmergencyScreen(),
             )),

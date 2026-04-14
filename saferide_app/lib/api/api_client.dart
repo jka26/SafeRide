@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:io';
+import 'dart:async';
 
 import 'package:http/http.dart' as http;
 
@@ -10,6 +12,7 @@ class ApiClient {
       : _httpClient = httpClient ?? http.Client();
 
   final http.Client _httpClient;
+  static const Duration _requestTimeout = Duration(seconds: 20);
 
   Uri _uri(String path, [Map<String, dynamic>? queryParameters]) {
     final base = ApiConfig.baseUrl.endsWith('/')
@@ -35,10 +38,8 @@ class ApiClient {
     String path, {
     Map<String, dynamic>? queryParameters,
   }) async {
-    final response = await _httpClient.get(
-      _uri(path, queryParameters),
-      headers: _headers(),
-    );
+    final uri = _uri(path, queryParameters);
+    final response = await _send(() => _httpClient.get(uri, headers: _headers()), uri);
     return _decode(response);
   }
 
@@ -46,10 +47,14 @@ class ApiClient {
     String path, {
     Map<String, dynamic>? body,
   }) async {
-    final response = await _httpClient.post(
-      _uri(path),
-      headers: _headers(),
-      body: jsonEncode(body ?? <String, dynamic>{}),
+    final uri = _uri(path);
+    final response = await _send(
+      () => _httpClient.post(
+        uri,
+        headers: _headers(),
+        body: jsonEncode(body ?? <String, dynamic>{}),
+      ),
+      uri,
     );
     return _decode(response);
   }
@@ -58,17 +63,57 @@ class ApiClient {
     String path, {
     Map<String, dynamic>? body,
   }) async {
-    final response = await _httpClient.patch(
-      _uri(path),
-      headers: _headers(),
-      body: jsonEncode(body ?? <String, dynamic>{}),
+    final uri = _uri(path);
+    final response = await _send(
+      () => _httpClient.patch(
+        uri,
+        headers: _headers(),
+        body: jsonEncode(body ?? <String, dynamic>{}),
+      ),
+      uri,
     );
     return _decode(response);
   }
 
+  Future<http.Response> _send(
+    Future<http.Response> Function() request,
+    Uri uri,
+  ) async {
+    try {
+      return await request().timeout(_requestTimeout);
+    } on TimeoutException {
+      throw ApiException(
+        statusCode: 0,
+        message: 'Request timed out after ${_requestTimeout.inSeconds}s ($uri)',
+      );
+    } on SocketException catch (e) {
+      throw ApiException(
+        statusCode: 0,
+        message: 'Could not connect to $uri (${e.message})',
+      );
+    } on http.ClientException catch (e) {
+      throw ApiException(
+        statusCode: 0,
+        message: 'Could not reach $uri (${e.message})',
+      );
+    } on FormatException catch (e) {
+      throw ApiException(
+        statusCode: 0,
+        message: 'Invalid response from $uri (${e.message})',
+      );
+    }
+  }
+
   dynamic _decode(http.Response response) {
     final hasBody = response.body.trim().isNotEmpty;
-    final payload = hasBody ? jsonDecode(response.body) : null;
+    dynamic payload;
+    if (hasBody) {
+      try {
+        payload = jsonDecode(response.body);
+      } catch (_) {
+        payload = response.body;
+      }
+    }
 
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return payload;
@@ -82,6 +127,8 @@ class ApiClient {
       } else if (raw != null) {
         message = raw.toString();
       }
+    } else if (payload is String && payload.isNotEmpty) {
+      message = payload;
     }
 
     throw ApiException(statusCode: response.statusCode, message: message);

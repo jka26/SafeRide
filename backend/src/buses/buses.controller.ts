@@ -33,6 +33,11 @@ export class BusesController {
     return this.busesService.findOne(id);
   }
 
+  @Get(':id/students')
+  students(@Param('id') id: string) {
+    return this.busesService.getBusStudents(id);
+  }
+
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: UpdateBusDto) {
     return this.busesService.update(id, dto);

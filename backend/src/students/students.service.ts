@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
@@ -15,8 +15,12 @@ export class StudentsService {
     return this.prisma.student.findMany({ orderBy: { createdAt: 'desc' } });
   }
 
-  findOne(id: string) {
-    return this.prisma.student.findUnique({ where: { id } });
+  async findOne(id: string) {
+    const student = await this.prisma.student.findUnique({ where: { id } });
+    if (!student) {
+      throw new NotFoundException('Student not found');
+    }
+    return student;
   }
 
   update(id: string, dto: UpdateStudentDto) {

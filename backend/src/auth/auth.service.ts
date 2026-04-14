@@ -1,7 +1,7 @@
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
-  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
@@ -9,6 +9,7 @@ import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../database/prisma.service';
 import { SignUpDto } from './dto/sign-up.dto';
 import { LoginDto } from './dto/login.dto';
+import { AppRole } from '../common/auth/roles.enum';
 
 @Injectable()
 export class AuthService {
@@ -28,8 +29,14 @@ export class AuthService {
   }
 
   async signUp(dto: SignUpDto) {
+    const normalizedEmail = dto.email.trim().toLowerCase();
+    const normalizedRole = dto.role.toString().toUpperCase() as AppRole;
+    if (normalizedRole != AppRole.PARENT && normalizedRole != AppRole.DRIVER) {
+      throw new ForbiddenException('Only PARENT and DRIVER can sign up publicly');
+    }
+
     const exists = await this.prisma.user.findUnique({
-      where: { email: dto.email },
+      where: { email: normalizedEmail },
       select: { id: true },
     });
     if (exists) {
@@ -37,19 +44,26 @@ export class AuthService {
     }
 
     const passwordHash = await bcrypt.hash(dto.password, 10);
-    const user = await this.prisma.user.create({
-      data: {
-        email: dto.email,
-        passwordHash,
-        role: dto.role,
-        fullName: dto.fullName,
-      },
-      select: {
-        id: true,
-        email: true,
-        role: true,
-        fullName: true,
-      },
+    const user = await this.prisma.$transaction(async (tx) => {
+      const createdUser = await tx.user.create({
+        data: {
+          email: normalizedEmail,
+          passwordHash,
+          role: normalizedRole,
+          fullName: dto.fullName,
+        },
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          fullName: true,
+        },
+      });
+
+      // Keep role tables in sync with user role from day one.
+      await this.ensureRoleProfile(createdUser.id, createdUser.role as AppRole, tx);
+
+      return createdUser;
     });
 
     const { token, expiresAt } = await this.issueSession(user.id);
@@ -62,8 +76,9 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
+    const normalizedEmail = dto.email.trim().toLowerCase();
     const user = await this.prisma.user.findUnique({
-      where: { email: dto.email },
+      where: { email: normalizedEmail },
     });
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
@@ -73,6 +88,9 @@ export class AuthService {
     if (!ok) {
       throw new UnauthorizedException('Invalid credentials');
     }
+
+    // Self-heal legacy users created before role profile rows were enforced.
+    await this.ensureRoleProfile(user.id, user.role as AppRole);
 
     const { token, expiresAt } = await this.issueSession(user.id);
 
@@ -91,9 +109,35 @@ export class AuthService {
   async logout(token: string) {
     const session = await this.prisma.session.findUnique({ where: { token } });
     if (!session) {
-      throw new NotFoundException('Session not found');
+      return { message: 'Logged out successfully' };
     }
     await this.prisma.session.delete({ where: { token } });
     return { message: 'Logged out successfully' };
+  }
+
+  private async ensureRoleProfile(
+    userId: string,
+    role: AppRole,
+    prismaLike: Pick<
+      PrismaService,
+      'parent' | 'driver'
+    > = this.prisma,
+  ) {
+    if (role === AppRole.DRIVER) {
+      await prismaLike.driver.upsert({
+        where: { userId },
+        update: {},
+        create: { userId },
+      });
+      return;
+    }
+
+    if (role === AppRole.PARENT) {
+      await prismaLike.parent.upsert({
+        where: { userId },
+        update: {},
+        create: { userId },
+      });
+    }
   }
 }

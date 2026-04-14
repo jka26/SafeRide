@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
-import '../../theme/app_theme.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:provider/provider.dart';
+
+import '../providers/dashboard_provider.dart';
+import '../services/notification_service.dart';
+import '../theme/app_theme.dart';
 
 class EmergencyScreen extends StatefulWidget {
   const EmergencyScreen({super.key});
@@ -9,16 +14,51 @@ class EmergencyScreen extends StatefulWidget {
 }
 
 class _EmergencyScreenState extends State<EmergencyScreen> {
+  final NotificationService _notificationService = NotificationService();
   bool _alertSent = false;
   bool _sending = false;
+  String? _errorMessage;
 
   Future<void> _sendAlert(String type) async {
     setState(() => _sending = true);
-    await Future.delayed(const Duration(seconds: 2));
-    setState(() {
-      _sending = false;
-      _alertSent = true;
-    });
+    try {
+      final tripId = context.read<DashboardProvider>().activeTrip?.id;
+      Position? position;
+      try {
+        if (await Geolocator.isLocationServiceEnabled()) {
+          var permission = await Geolocator.checkPermission();
+          if (permission == LocationPermission.denied) {
+            permission = await Geolocator.requestPermission();
+          }
+          if (permission != LocationPermission.denied &&
+              permission != LocationPermission.deniedForever) {
+            position = await Geolocator.getCurrentPosition(
+              locationSettings:
+                  const LocationSettings(accuracy: LocationAccuracy.high),
+            );
+          }
+        }
+      } catch (_) {
+        // Emergency alert still proceeds even if location cannot be fetched.
+      }
+
+      await _notificationService.reportEmergency(
+        type: type,
+        tripId: tripId,
+        latitude: position?.latitude,
+        longitude: position?.longitude,
+      );
+      setState(() {
+        _sending = false;
+        _alertSent = true;
+        _errorMessage = null;
+      });
+    } catch (e) {
+      setState(() {
+        _sending = false;
+        _errorMessage = e.toString();
+      });
+    }
   }
 
   @override
@@ -43,10 +83,13 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
-        child: _alertSent ? _SuccessView() : _AlertForm(
-          sending: _sending,
-          onSend: _sendAlert,
-        ),
+        child: _alertSent
+            ? _SuccessView()
+            : _AlertForm(
+                sending: _sending,
+                errorMessage: _errorMessage,
+                onSend: _sendAlert,
+              ),
       ),
     );
   }
@@ -54,9 +97,14 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
 
 class _AlertForm extends StatelessWidget {
   final bool sending;
+  final String? errorMessage;
   final Function(String) onSend;
 
-  const _AlertForm({required this.sending, required this.onSend});
+  const _AlertForm({
+    required this.sending,
+    required this.errorMessage,
+    required this.onSend,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -140,6 +188,17 @@ class _AlertForm extends StatelessWidget {
           sending: sending,
           onTap: () => onSend('other'),
         ),
+        if (errorMessage != null) ...[
+          const SizedBox(height: 14),
+          Text(
+            errorMessage!,
+            style: const TextStyle(
+              fontFamily: 'Outfit',
+              fontSize: 12,
+              color: AppColors.error,
+            ),
+          ),
+        ],
       ],
     );
   }

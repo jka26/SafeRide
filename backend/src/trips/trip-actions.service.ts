@@ -178,6 +178,47 @@ export class TripActionsService {
     };
   }
 
+  async getLiveForOperations(tripId: string, actor: AuthenticatedUser) {
+    const scopedTrip = await this.prisma.trip.findUnique({
+      where: { id: tripId },
+      select: { id: true, driverId: true, status: true },
+    });
+    if (!scopedTrip) {
+      throw new NotFoundException(`Trip ${tripId} not found`);
+    }
+    await this.assertCanOperateTrip(actor, scopedTrip);
+
+    const trip = await this.prisma.trip.findUnique({
+      where: { id: tripId },
+      include: {
+        bus: { select: { plateNumber: true, routeName: true } },
+        driver: { include: { user: { select: { fullName: true } } } },
+        locations: { orderBy: { recordedAt: 'desc' }, take: 50 },
+      },
+    });
+    if (!trip) {
+      throw new NotFoundException(`Trip ${tripId} not found`);
+    }
+
+    const locations = [...trip.locations].reverse();
+    return {
+      trip: {
+        id: trip.id,
+        name: trip.name,
+        status: trip.status,
+        tripDate: trip.tripDate,
+        startedAt: trip.startedAt,
+        endedAt: trip.endedAt,
+        currentStopName: trip.currentStopName,
+        etaMinutes: trip.etaMinutes,
+        bus: trip.bus,
+        driverName: trip.driver?.user.fullName ?? null,
+      },
+      latestLocation: trip.locations[0] ?? null,
+      recentLocations: locations,
+    };
+  }
+
   private async assertCanOperateTrip(
     actor: AuthenticatedUser,
     trip: { driverId: string | null },

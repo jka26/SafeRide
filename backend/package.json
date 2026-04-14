@@ -21,7 +21,8 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
-    "prisma:seed": "prisma db seed"
+    "prisma:seed": "prisma db seed",
+    "prisma:repair-role-profiles": "node prisma/repair-role-profiles.js"
   },
   "prisma": {
     "seed": "node prisma/seed.js"

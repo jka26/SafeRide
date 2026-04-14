@@ -1,8 +1,6 @@
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
-import '../api/api_config.dart';
+import '../api/api_client.dart';
+import '../api/session_store.dart';
 
 enum UserRole { parent, driver, admin }
 
@@ -22,10 +20,14 @@ class AuthenticatedUser {
   });
 
   factory AuthenticatedUser.fromJson(Map<String, dynamic> json) {
+    final normalizedRole = (json['role'] ?? 'PARENT')
+        .toString()
+        .trim()
+        .toLowerCase();
     return AuthenticatedUser(
       id: json['id'] ?? '',
       email: json['email'] ?? '',
-      role: json['role'] ?? 'parent',
+      role: normalizedRole,
       fullName: json['fullName'] ?? '',
     );
   }
@@ -40,6 +42,10 @@ class AuthenticatedUser {
 }
 
 class AuthProvider extends ChangeNotifier {
+  AuthProvider({ApiClient? apiClient}) : _apiClient = apiClient ?? ApiClient();
+
+  final ApiClient _apiClient;
+
   AuthStatus _status = AuthStatus.idle;
   String? _errorMessage;
   AuthenticatedUser? _currentUser;
@@ -57,46 +63,26 @@ class AuthProvider extends ChangeNotifier {
   // Convenience getter — used by DashboardScreen
   UserRole? get selectedRole => _currentUser?.userRole;
 
-  // ── Persist session to local storage ──────────────────────
-  Future<void> _saveSession(String token) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('session_token', token);
-  }
-
-  Future<void> _clearSession() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('session_token');
-  }
-
   /// Call this on app start to restore a saved session.
   /// Returns true if a valid session was found, false otherwise.
   Future<bool> restoreSession() async {
-    final prefs = await SharedPreferences.getInstance();
-    final saved = prefs.getString('session_token');
+    final saved = SessionStore.instance.token;
     if (saved == null || saved.isEmpty) return false;
 
     try {
-      final response = await http.get(
-        Uri.parse('${ApiConfig.baseUrl}/auth/me'),
-        headers: {
-          'Authorization': 'Bearer $saved',
-          'Content-Type': 'application/json',
-        },
-      );
-      if (response.statusCode == 200) {
-        final json = jsonDecode(response.body) as Map<String, dynamic>;
-        _currentUser = AuthenticatedUser.fromJson(json);
-        _sessionToken = saved;
-        _status = AuthStatus.success;
-        notifyListeners();
-        return true;
-      } else {
-        // Token expired or invalid — clear it
-        await _clearSession();
-        return false;
-      }
+      SessionStore.instance.token = saved;
+      final body = await _apiClient.get('/auth/me') as Map<String, dynamic>;
+      _currentUser = AuthenticatedUser.fromJson(body);
+      _sessionToken = saved;
+      _status = AuthStatus.success;
+      notifyListeners();
+      return true;
     } catch (_) {
-      await _clearSession();
+      await SessionStore.instance.clear();
+      _sessionToken = null;
+      _currentUser = null;
+      _status = AuthStatus.idle;
+      _errorMessage = null;
       return false;
     }
   }
@@ -109,68 +95,77 @@ class AuthProvider extends ChangeNotifier {
     required String fullName,
     required String role, // 'parent' or 'driver'
   }) async {
+    if (_status == AuthStatus.loading) return;
     _setLoading();
 
     try {
-      final response = await http.post(
-        Uri.parse('${ApiConfig.baseUrl}/auth/signup'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
+      final body = await _apiClient.post(
+        '/auth/signup',
+        body: {
           'email': email,
           'password': password,
           'fullName': fullName,
-          'role': role,
-        }),
-      );
+          'role': role.trim().toUpperCase(),
+        },
+      ) as Map<String, dynamic>;
 
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
-
-      if (response.statusCode == 201 || response.statusCode == 200) {
-        _sessionToken = body['token'];
-        _currentUser = AuthenticatedUser.fromJson(body['user']);
-        await _saveSession(_sessionToken!);
-        _status = AuthStatus.success;
-        _errorMessage = null;
-      } else {
-        // Backend error — e.g. 409 ConflictException "Email already in use"
-        _setError(body['message'] ?? 'Sign up failed. Please try again.');
+      _sessionToken = body['token']?.toString();
+      final userData = (body['user'] as Map?)?.cast<String, dynamic>() ?? body;
+      _currentUser = AuthenticatedUser.fromJson(userData);
+      if (_sessionToken != null && _sessionToken!.isNotEmpty) {
+        SessionStore.instance.token = _sessionToken;
       }
+      _status = AuthStatus.success;
+      _errorMessage = null;
+    } on ApiException catch (e) {
+      _setError(e.message);
     } catch (e) {
-      _setError('Could not connect to server. Check your connection.');
+      _setError(e.toString());
     }
 
     notifyListeners();
   }
 
+  Future<void> signUpWithEmail(
+    String email,
+    String password, {
+    required String fullName,
+  }) {
+    return signUp(
+      email: email,
+      password: password,
+      fullName: fullName,
+      role: 'PARENT',
+    );
+  }
+
   // ── Login ──────────────────────────────────────────────────
   // Backend expects: { email, password }
   Future<void> loginWithEmail(String email, String password) async {
+    if (_status == AuthStatus.loading) return;
     _setLoading();
 
     try {
-      final response = await http.post(
-        Uri.parse('${ApiConfig.baseUrl}/auth/login'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
+      final body = await _apiClient.post(
+        '/auth/login',
+        body: {
           'email': email,
           'password': password,
-        }),
-      );
+        },
+      ) as Map<String, dynamic>;
 
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        _sessionToken = body['token'];
-        _currentUser = AuthenticatedUser.fromJson(body['user']);
-        await _saveSession(_sessionToken!);
-        _status = AuthStatus.success;
-        _errorMessage = null;
-      } else {
-        // 401 UnauthorizedException "Invalid credentials"
-        _setError(body['message'] ?? 'Invalid email or password.');
+      _sessionToken = body['token']?.toString();
+      final userData = (body['user'] as Map?)?.cast<String, dynamic>() ?? body;
+      _currentUser = AuthenticatedUser.fromJson(userData);
+      if (_sessionToken != null && _sessionToken!.isNotEmpty) {
+        SessionStore.instance.token = _sessionToken;
       }
+      _status = AuthStatus.success;
+      _errorMessage = null;
+    } on ApiException catch (e) {
+      _setError(e.message);
     } catch (e) {
-      _setError('Could not connect to server. Check your connection.');
+      _setError(e.toString());
     }
 
     notifyListeners();
@@ -178,26 +173,19 @@ class AuthProvider extends ChangeNotifier {
 
   // ── Logout ─────────────────────────────────────────────────
   Future<void> signOut() async {
-    if (_sessionToken != null) {
+    if (_sessionToken != null && _sessionToken!.isNotEmpty) {
       try {
-        // Tell the backend to delete the session from the DB
-        await http.post(
-          Uri.parse('${ApiConfig.baseUrl}/auth/logout'),
-          headers: {
-            'Authorization': 'Bearer $_sessionToken',
-            'Content-Type': 'application/json',
-          },
-        );
+        await _apiClient.post('/auth/logout');
       } catch (_) {
-        // Even if the server call fails, clear local state
+        // Even if server logout fails, local sign-out should proceed.
       }
     }
 
+    await SessionStore.instance.clear();
     _sessionToken = null;
     _currentUser = null;
     _status = AuthStatus.idle;
     _errorMessage = null;
-    await _clearSession();
     notifyListeners();
   }
 
