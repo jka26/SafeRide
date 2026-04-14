@@ -22,6 +22,7 @@ class _SignUpScreenState extends State<SignUpScreen>
   final _fullNameCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   final _confirmPasswordCtrl = TextEditingController();
+  String _selectedRole = 'PARENT';
   final _formKey = GlobalKey<FormState>();
 
   bool _passwordVisible = false;
@@ -98,11 +99,12 @@ class _SignUpScreenState extends State<SignUpScreen>
 
   Future<void> _handleSignUp() async {
     if (!_formKey.currentState!.validate()) return;
-    await context.read<AuthProvider>().signUpWithEmail(
-          _emailCtrl.text.trim(),
-          _passwordCtrl.text,
-          fullName: _fullNameCtrl.text.trim(),
-        );
+    await context.read<AuthProvider>().signUp(
+      email: _emailCtrl.text.trim(),
+      password: _passwordCtrl.text,
+      fullName: _fullNameCtrl.text.trim(),
+      role: _selectedRole,   // ← use the dropdown value, not the controller
+    );
     final auth = context.read<AuthProvider>();
     if (auth.status == AuthStatus.success && mounted) {
       Navigator.of(context).pushReplacement(
@@ -361,6 +363,45 @@ class _SignUpScreenState extends State<SignUpScreen>
                                   return null;
                                 },
                               ),
+                              const SizedBox(height: 16),
+
+                              // role selection
+                              const _FieldLabel(label: 'I am a'),
+                              const SizedBox(height: 10),
+                              DropdownButtonFormField<String>(
+                                value: _selectedRole,
+                                onChanged: (v) => setState(() => _selectedRole = v!),
+                                validator: (v) => v == null || v.isEmpty ? 'Please select a role' : null,
+                                decoration: InputDecoration(
+                                  filled: true,
+                                  fillColor: Colors.white,
+                                  prefixIcon: const Icon(Icons.badge_outlined, size: 18, color: AppColors.textSecondary),
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: const BorderSide(color: AppColors.divider),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: const BorderSide(color: AppColors.divider),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: const BorderSide(color: AppColors.primaryLight, width: 2),
+                                  ),
+                                ),
+                                style: const TextStyle(
+                                  fontFamily: 'Outfit',
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: AppColors.textPrimary,
+                                ),
+                                items: const [
+                                  DropdownMenuItem(value: 'PARENT', child: Text('Parent')),
+                                  DropdownMenuItem(value: 'DRIVER', child: Text('Driver')),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
 
                               // Error banner
                               if (auth.hasError &&
