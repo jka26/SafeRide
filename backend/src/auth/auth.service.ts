@@ -44,19 +44,26 @@ export class AuthService {
     }
 
     const passwordHash = await bcrypt.hash(dto.password, 10);
-    const user = await this.prisma.user.create({
-      data: {
-        email: normalizedEmail,
-        passwordHash,
-        role: normalizedRole,
-        fullName: dto.fullName,
-      },
-      select: {
-        id: true,
-        email: true,
-        role: true,
-        fullName: true,
-      },
+    const user = await this.prisma.$transaction(async (tx) => {
+      const createdUser = await tx.user.create({
+        data: {
+          email: normalizedEmail,
+          passwordHash,
+          role: normalizedRole,
+          fullName: dto.fullName,
+        },
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          fullName: true,
+        },
+      });
+
+      // Keep role tables in sync with user role from day one.
+      await this.ensureRoleProfile(createdUser.id, createdUser.role as AppRole, tx);
+
+      return createdUser;
     });
 
     const { token, expiresAt } = await this.issueSession(user.id);
@@ -82,6 +89,9 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    // Self-heal legacy users created before role profile rows were enforced.
+    await this.ensureRoleProfile(user.id, user.role as AppRole);
+
     const { token, expiresAt } = await this.issueSession(user.id);
 
     return {
@@ -103,5 +113,31 @@ export class AuthService {
     }
     await this.prisma.session.delete({ where: { token } });
     return { message: 'Logged out successfully' };
+  }
+
+  private async ensureRoleProfile(
+    userId: string,
+    role: AppRole,
+    prismaLike: Pick<
+      PrismaService,
+      'parent' | 'driver'
+    > = this.prisma,
+  ) {
+    if (role === AppRole.DRIVER) {
+      await prismaLike.driver.upsert({
+        where: { userId },
+        update: {},
+        create: { userId },
+      });
+      return;
+    }
+
+    if (role === AppRole.PARENT) {
+      await prismaLike.parent.upsert({
+        where: { userId },
+        update: {},
+        create: { userId },
+      });
+    }
   }
 }

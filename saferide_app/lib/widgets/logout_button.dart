@@ -122,7 +122,7 @@ class LogoutButton extends StatelessWidget {
     context.read<AuthProvider>().signOut();
 
     // Clear dashboard state
-    context.read<DashboardProvider>().loadDashboard('');
+    context.read<DashboardProvider>().clearDashboardState();
 
     // Navigate to welcome screen, removing all previous routes
     Navigator.of(context).pushAndRemoveUntil(

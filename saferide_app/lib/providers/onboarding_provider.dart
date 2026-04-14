@@ -1,8 +1,12 @@
 import 'package:flutter/foundation.dart';
+import '../api/api_client.dart';
 
 enum OnboardingStatus { idle, loading, success, error }
 
 class OnboardingProvider extends ChangeNotifier {
+  OnboardingProvider({ApiClient? apiClient}) : _apiClient = apiClient ?? ApiClient();
+
+  final ApiClient _apiClient;
   OnboardingStatus _status = OnboardingStatus.idle;
   String? _errorMessage;
 
@@ -21,15 +25,24 @@ class OnboardingProvider extends ChangeNotifier {
     required String emergencyContactPhone,
   }) async {
     _setLoading();
-
-    // MOCK — replace with real API call when backend is ready:
-    // POST ${ApiConfig.baseUrl}/onboarding/parent
-    // body: { fullName, phone, childName, childGrade, stopName,
-    //         emergencyContact: { name, phone } }
-
-    await Future.delayed(const Duration(seconds: 2));
-    _status = OnboardingStatus.success;
-    notifyListeners();
+    try {
+      await _apiClient.post(
+        '/onboarding/parent',
+        body: {
+          'childName': childName,
+          'grade': childGrade,
+          'stopName': stopName,
+          'emergencyContactName': emergencyContactName,
+          'emergencyContactPhone': emergencyContactPhone,
+        },
+      );
+      _status = OnboardingStatus.success;
+      notifyListeners();
+    } on ApiException catch (e) {
+      _setError(e.message);
+    } catch (e) {
+      _setError(e.toString());
+    }
   }
 
   Future<void> submitDriverDetails({
@@ -41,15 +54,23 @@ class OnboardingProvider extends ChangeNotifier {
     required String emergencyContactPhone,
   }) async {
     _setLoading();
-
-    // MOCK — replace with real API call when backend is ready:
-    // POST ${ApiConfig.baseUrl}/onboarding/driver
-    // body: { fullName, phone, busNumber, routeName,
-    //         emergencyContact: { name, phone } }
-
-    await Future.delayed(const Duration(seconds: 2));
-    _status = OnboardingStatus.success;
-    notifyListeners();
+    try {
+      await _apiClient.post(
+        '/onboarding/driver',
+        body: {
+          'busNumber': busNumber,
+          'routeName': routeName,
+          'emergencyContactName': emergencyContactName,
+          'emergencyContactPhone': emergencyContactPhone,
+        },
+      );
+      _status = OnboardingStatus.success;
+      notifyListeners();
+    } on ApiException catch (e) {
+      _setError(e.message);
+    } catch (e) {
+      _setError(e.toString());
+    }
   }
 
   void reset() {

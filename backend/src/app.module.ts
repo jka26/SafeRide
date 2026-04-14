@@ -14,6 +14,7 @@ import { CsvImportModule } from './csv-import/csv-import.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { RoutesModule } from './routes/routes.module';
 import { ParentsModule } from './parents/parents.module';
+import { OnboardingModule } from './onboarding/onboarding.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { ParentsModule } from './parents/parents.module';
     DashboardModule,
     RoutesModule,
     ParentsModule,
+    OnboardingModule,
   ],
   controllers: [AppController],
   providers: [],

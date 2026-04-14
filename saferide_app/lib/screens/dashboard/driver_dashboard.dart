@@ -54,9 +54,12 @@ class DriverDashboard extends StatelessWidget {
                     child: _StudentList(students: dashboard.students),
                   ),
                   const SizedBox(height: 14),
-                  const FadeSlideIn(
+                  FadeSlideIn(
                     delay: Duration(milliseconds: 180),
-                    child: _QuickActions(),
+                    child: _QuickActions(
+                      tripId: trip?.id,
+                      hasTrip: trip != null,
+                    ),
                   ),
                   const SizedBox(height: 16),
                 ],
@@ -486,7 +489,10 @@ class _ToggleButton extends StatelessWidget {
 // Quick actions
 
 class _QuickActions extends StatelessWidget {
-  const _QuickActions();
+  final String? tripId;
+  final bool hasTrip;
+
+  const _QuickActions({required this.tripId, required this.hasTrip});
 
   @override
   Widget build(BuildContext context) {
@@ -505,12 +511,15 @@ class _QuickActions extends StatelessWidget {
               fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
           const SizedBox(height: 12),
           TapScale(
-            onTap: () => Navigator.of(context).push(MaterialPageRoute(
-              builder: (_) => const RouteMapScreen(
-                title: 'Full Route',
-                color: AppColors.secondary,
-              ),
-            )),
+            onTap: !hasTrip || tripId == null
+                ? null
+                : () => Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) => RouteMapScreen(
+                        title: 'Full Route',
+                        color: AppColors.secondary,
+                        tripId: tripId!,
+                      ),
+                    )),
             child: const _ActionRow(
               icon: Icons.map_rounded,
               label: 'View Full Route',

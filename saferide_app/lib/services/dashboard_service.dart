@@ -128,8 +128,26 @@ class DashboardService {
     final todaysTrips = (response['todaysTrips'] ?? []) as List<dynamic>;
     final recentNotifications =
         (response['recentNotifications'] ?? []) as List<dynamic>;
+    final inProgressTrips = (response['inProgressTrips'] ?? []) as List<dynamic>;
     final metrics = (response['metrics'] ?? const <String, dynamic>{})
         as Map<String, dynamic>;
+
+    final locationByTrip = <String, Map<String, dynamic>>{};
+    for (final item in inProgressTrips) {
+      final map = item as Map<String, dynamic>;
+      final tripId = (map['id'] ?? '').toString();
+      if (tripId.isEmpty) continue;
+      final latest =
+          ((map['locations'] as List<dynamic>?) ?? const <dynamic>[])
+              .cast<Map<String, dynamic>>();
+      final latestPoint = latest.isNotEmpty ? latest.first : null;
+      locationByTrip[tripId] = {
+        'latitude': (latestPoint?['latitude'] as num?)?.toDouble(),
+        'longitude': (latestPoint?['longitude'] as num?)?.toDouble(),
+        'currentStopName': (map['currentStopName'] as String?)?.trim(),
+        'etaMinutes': (map['etaMinutes'] as num?)?.toInt(),
+      };
+    }
 
     final present = (todaysAttendance['present'] as num?)?.toInt() ?? 0;
     final absent = (todaysAttendance['absent'] as num?)?.toInt() ?? 0;
@@ -138,7 +156,18 @@ class DashboardService {
     return AdminDashboardData(
       currentUser: user,
       buses: todaysTrips
-          .map((item) => BusModel.fromAdminTrip(item as Map<String, dynamic>))
+          .map((item) {
+            final trip = item as Map<String, dynamic>;
+            final tripId = (trip['id'] ?? '').toString();
+            final loc = locationByTrip[tripId] ?? const <String, dynamic>{};
+            return BusModel.fromAdminTrip(
+              trip,
+              latitude: loc['latitude'] as double?,
+              longitude: loc['longitude'] as double?,
+              currentStopName: loc['currentStopName'] as String?,
+              etaMinutes: loc['etaMinutes'] as int?,
+            );
+          })
           .toList(),
       totalStudentsOnBoard:
           (metrics['studentsOnBoard'] as num?)?.toInt() ?? present,

@@ -84,8 +84,8 @@ class _UploadView extends StatelessWidget {
                 Expanded(
                   child: Text(
                     'Upload a CSV file with student details. '
-                    'The file must have columns in this order:\n'
-                    'studentCode, fullName, grade',
+                    'Required columns: studentCode, fullName, grade.\n'
+                    'You can also include optional columns for routing and contacts.',
                     style: TextStyle(
                       fontFamily: 'Outfit', fontSize: 12,
                       color: Color(0xFF6D28D9), height: 1.6,
@@ -111,7 +111,7 @@ class _UploadView extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Expected column order:',
+                const Text('Required columns:',
                   style: TextStyle(fontFamily: 'Outfit', fontSize: 12,
                     fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary)),
@@ -142,6 +142,31 @@ class _UploadView extends StatelessWidget {
                         fontWeight: FontWeight.w500)),
                   ]),
                 )),
+                const SizedBox(height: 10),
+                const Text('Optional supported columns:',
+                  style: TextStyle(fontFamily: 'Outfit', fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary)),
+                const SizedBox(height: 8),
+                const Text(
+                  'routeName, busLabel, stopName, dropOffTime, '
+                  'emergencyContactName, emergencyContactPhone',
+                  style: TextStyle(
+                    fontFamily: 'Outfit',
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Headers are matched by name, so strict column order is not required.',
+                  style: TextStyle(
+                    fontFamily: 'Outfit',
+                    fontSize: 11,
+                    color: AppColors.textHint,
+                  ),
+                ),
               ],
             ),
           ),
