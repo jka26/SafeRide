@@ -5,6 +5,7 @@ import 'api/session_store.dart';
 import 'providers/auth_provider.dart';
 import 'providers/dashboard_provider.dart';
 import 'providers/csv_upload_provider.dart';
+import 'providers/onboarding_provider.dart';
 import 'screens/welcome_screen.dart';
 import 'screens/dashboard/dashboard_screen.dart';
 
@@ -21,6 +22,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => DashboardProvider()),
         ChangeNotifierProvider(create: (_) => CsvUploadProvider()),
+        ChangeNotifierProvider(create: (_) => OnboardingProvider()),
       ],
       child: const SafeRideApp(),
     ),

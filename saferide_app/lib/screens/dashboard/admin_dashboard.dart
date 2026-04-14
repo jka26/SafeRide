@@ -7,6 +7,7 @@ import '../../admin/bus_students_screen.dart';
 import '../../admin/csv_upload_screen.dart';
 import '../../maps/fleet_map_screen.dart';
 import '../../maps/route_map_screen.dart';
+import '../../widgets/logout_button.dart';
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -111,6 +112,8 @@ class _AdminAppBar extends StatelessWidget {
                     fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white)),
                 ]),
               ),
+              const SizedBox(width: 8),
+              const LogoutButton(),
             ],
           ),
           const SizedBox(height: 14),

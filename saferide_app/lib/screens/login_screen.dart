@@ -5,6 +5,7 @@ import '../../theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
 import 'signup_screen.dart';
 import 'dashboard/dashboard_screen.dart';
+import '../screens/onboarding_step1_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -65,9 +66,15 @@ class _LoginScreenState extends State<LoginScreen>
     final auth = context.read<AuthProvider>();
     if (auth.status == AuthStatus.success && mounted) {
       // TODO: navigate to role-based dashboard
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const DashboardScreen()),
-      );
+      if (user.onboardingComplete) {
+        // Go straight to dashboard
+        Navigator.pushReplacement(context,
+          MaterialPageRoute(builder: (_) => const DashboardScreen()));
+      } else {
+        // First time — go to onboarding
+        Navigator.pushReplacement(context,
+          MaterialPageRoute(builder: (_) => const OnboardingStep1Screen()));
+      }
     }
   }
 

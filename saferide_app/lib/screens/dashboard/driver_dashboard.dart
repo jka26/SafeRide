@@ -5,6 +5,7 @@ import '../../providers/dashboard_provider.dart';
 import '../../models/student_model.dart';
 import '../../emergency/emergency_screen.dart';
 import '../../maps/route_map_screen.dart';
+import '../../widgets/logout_button.dart';
 
 class DriverDashboard extends StatelessWidget {
   const DriverDashboard({super.key});
@@ -93,6 +94,8 @@ class _DriverAppBar extends StatelessWidget {
               ],
             ),
           ),
+          const SizedBox(width: 8),
+          const LogoutButton(),
         ],
       ),
     );
