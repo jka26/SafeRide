@@ -128,6 +128,8 @@ class DashboardService {
     final todaysTrips = (response['todaysTrips'] ?? []) as List<dynamic>;
     final recentNotifications =
         (response['recentNotifications'] ?? []) as List<dynamic>;
+    final metrics = (response['metrics'] ?? const <String, dynamic>{})
+        as Map<String, dynamic>;
 
     final present = (todaysAttendance['present'] as num?)?.toInt() ?? 0;
     final absent = (todaysAttendance['absent'] as num?)?.toInt() ?? 0;
@@ -138,11 +140,17 @@ class DashboardService {
       buses: todaysTrips
           .map((item) => BusModel.fromAdminTrip(item as Map<String, dynamic>))
           .toList(),
-      totalStudentsOnBoard: present,
+      totalStudentsOnBoard:
+          (metrics['studentsOnBoard'] as num?)?.toInt() ?? present,
       activeAlerts: recentNotifications.length,
-      completedTrips: todaysTrips.length,
-      activeRoutes: (counts['buses'] as num?)?.toInt() ?? 0,
-      onTimeRate: totalMarked == 0 ? 0 : (present / totalMarked) * 100,
+      completedTrips:
+          (metrics['completedTrips'] as num?)?.toInt() ?? todaysTrips.length,
+      activeRoutes: (metrics['activeRoutes'] as num?)?.toInt() ??
+          (counts['buses'] as num?)?.toInt() ??
+          0,
+      onTimeRate:
+          (metrics['onTimeRate'] as num?)?.toDouble() ??
+              (totalMarked == 0 ? 0 : (present / totalMarked) * 100),
     );
   }
 
