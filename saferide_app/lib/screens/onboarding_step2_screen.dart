@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:provider/provider.dart';
 import '../../theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
@@ -34,6 +35,52 @@ class _OnboardingStep2ScreenState extends State<OnboardingStep2Screen>
   final _routeNameCtrl = TextEditingController();
   final _driverEmergencyNameCtrl = TextEditingController();
   final _driverEmergencyPhoneCtrl = TextEditingController();
+
+  Future<void> _pickEmergencyContact({
+    required TextEditingController nameController,
+    required TextEditingController phoneController,
+  }) async {
+    try {
+      final hasPermission = await FlutterContacts.requestPermission();
+      if (!hasPermission) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Contact permission denied. Enter details manually.'),
+            ),
+          );
+        }
+        return;
+      }
+
+      final contact = await FlutterContacts.openExternalPick();
+      if (contact == null) return;
+
+      final detailed = await FlutterContacts.getContact(
+        contact.id,
+        withProperties: true,
+      );
+      if (detailed == null) return;
+
+      final selectedPhone = detailed.phones.isNotEmpty
+          ? detailed.phones.first.normalizedNumber.isNotEmpty
+              ? detailed.phones.first.normalizedNumber
+              : detailed.phones.first.number
+          : '';
+
+      nameController.text = detailed.displayName.trim();
+      if (selectedPhone.isNotEmpty) {
+        phoneController.text = selectedPhone.trim();
+      }
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not access contacts. Enter details manually.'),
+        ),
+      );
+    }
+  }
 
   @override
   void initState() {
@@ -201,6 +248,25 @@ class _OnboardingStep2ScreenState extends State<OnboardingStep2Screen>
                                   routeNameCtrl: _routeNameCtrl,
                                   emergencyNameCtrl: _driverEmergencyNameCtrl,
                                   emergencyPhoneCtrl: _driverEmergencyPhoneCtrl,
+<<<<<<< HEAD
+=======
+                                  onPickEmergencyContact: () => _pickEmergencyContact(
+                                    nameController: _driverEmergencyNameCtrl,
+                                    phoneController: _driverEmergencyPhoneCtrl,
+                                  ),
+                                )
+                              else
+                                _ParentFields(
+                                  childNameCtrl: _childNameCtrl,
+                                  childGradeCtrl: _childGradeCtrl,
+                                  stopNameCtrl: _stopNameCtrl,
+                                  emergencyNameCtrl: _emergencyNameCtrl,
+                                  emergencyPhoneCtrl: _emergencyPhoneCtrl,
+                                  onPickEmergencyContact: () => _pickEmergencyContact(
+                                    nameController: _emergencyNameCtrl,
+                                    phoneController: _emergencyPhoneCtrl,
+                                  ),
+>>>>>>> d766cd7d970349a6d5b9f3c9c622945606e2bee8
                                 ),
 
                                 // Error banner (driver only)
@@ -246,6 +312,7 @@ class _OnboardingStep2ScreenState extends State<OnboardingStep2Screen>
 
 // ── Parent search section ─────────────────────────────────────────────────────
 
+<<<<<<< HEAD
 class _ParentSearchSection extends StatefulWidget {
   final VoidCallback onLinked;
   const _ParentSearchSection({required this.onLinked});
@@ -262,6 +329,24 @@ class _ParentSearchSectionState extends State<_ParentSearchSection> {
     _codeCtrl.dispose();
     super.dispose();
   }
+=======
+class _ParentFields extends StatelessWidget {
+  final TextEditingController childNameCtrl;
+  final TextEditingController childGradeCtrl;
+  final TextEditingController stopNameCtrl;
+  final TextEditingController emergencyNameCtrl;
+  final TextEditingController emergencyPhoneCtrl;
+  final VoidCallback onPickEmergencyContact;
+
+  const _ParentFields({
+    required this.childNameCtrl,
+    required this.childGradeCtrl,
+    required this.stopNameCtrl,
+    required this.emergencyNameCtrl,
+    required this.emergencyPhoneCtrl,
+    required this.onPickEmergencyContact,
+  });
+>>>>>>> d766cd7d970349a6d5b9f3c9c622945606e2bee8
 
   @override
   Widget build(BuildContext context) {
@@ -279,6 +364,7 @@ class _ParentSearchSectionState extends State<_ParentSearchSection> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+<<<<<<< HEAD
               Expanded(
                 child: TextFormField(
                   controller: _codeCtrl,
@@ -318,6 +404,40 @@ class _ParentSearchSectionState extends State<_ParentSearchSection> {
                             color: AppColors.primaryLight, width: 2)),
                   ),
                 ),
+=======
+              const Row(children: [
+                Icon(Icons.emergency_rounded, color: AppColors.error, size: 16),
+                SizedBox(width: 6),
+                Text('Emergency Contact',
+                  style: TextStyle(fontFamily: 'Outfit', fontSize: 13,
+                    fontWeight: FontWeight.w700, color: AppColors.error)),
+              ]),
+              const SizedBox(height: 10),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: onPickEmergencyContact,
+                  icon: const Icon(Icons.contacts_rounded, size: 16),
+                  label: const Text('Pick from contacts'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    padding: EdgeInsets.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    minimumSize: const Size(0, 0),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              const _FieldLabel(label: 'Contact name'),
+              const SizedBox(height: 6),
+              _InputField(
+                controller: emergencyNameCtrl,
+                hint: 'e.g. John Johnson',
+                icon: Icons.person_outline_rounded,
+                keyboardType: TextInputType.name,
+                validator: (v) => v == null || v.trim().isEmpty
+                    ? 'Emergency contact name is required' : null,
+>>>>>>> d766cd7d970349a6d5b9f3c9c622945606e2bee8
               ),
               const SizedBox(width: 10),
               SizedBox(
@@ -550,12 +670,14 @@ class _DriverFields extends StatelessWidget {
   final TextEditingController routeNameCtrl;
   final TextEditingController emergencyNameCtrl;
   final TextEditingController emergencyPhoneCtrl;
+  final VoidCallback onPickEmergencyContact;
 
   const _DriverFields({
     required this.busNumberCtrl,
     required this.routeNameCtrl,
     required this.emergencyNameCtrl,
     required this.emergencyPhoneCtrl,
+    required this.onPickEmergencyContact,
   });
 
   @override
@@ -605,6 +727,21 @@ class _DriverFields extends StatelessWidget {
                   style: TextStyle(fontFamily: 'Outfit', fontSize: 13,
                     fontWeight: FontWeight.w700, color: AppColors.error)),
               ]),
+              const SizedBox(height: 10),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: onPickEmergencyContact,
+                  icon: const Icon(Icons.contacts_rounded, size: 16),
+                  label: const Text('Pick from contacts'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    padding: EdgeInsets.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    minimumSize: const Size(0, 0),
+                  ),
+                ),
+              ),
               const SizedBox(height: 12),
               const _FieldLabel(label: 'Contact name'),
               const SizedBox(height: 6),

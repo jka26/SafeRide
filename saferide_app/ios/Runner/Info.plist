@@ -28,6 +28,8 @@
 	<true/>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>SafeRide uses your location to share live bus tracking with parents during active trips.</string>
+	<key>NSContactsUsageDescription</key>
+	<string>SafeRide uses contacts so you can quickly select emergency contacts during onboarding.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

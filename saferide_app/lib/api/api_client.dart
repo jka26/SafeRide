@@ -13,6 +13,8 @@ class ApiClient {
 
   final http.Client _httpClient;
   static const Duration _requestTimeout = Duration(seconds: 20);
+  static const int _maxNetworkRetries = 2;
+  static const Duration _retryDelay = Duration(milliseconds: 500);
 
   Uri _uri(String path, [Map<String, dynamic>? queryParameters]) {
     final base = ApiConfig.baseUrl.endsWith('/')
@@ -79,29 +81,44 @@ class ApiClient {
     Future<http.Response> Function() request,
     Uri uri,
   ) async {
-    try {
-      return await request().timeout(_requestTimeout);
-    } on TimeoutException {
-      throw ApiException(
-        statusCode: 0,
-        message: 'Request timed out after ${_requestTimeout.inSeconds}s ($uri)',
-      );
-    } on SocketException catch (e) {
-      throw ApiException(
-        statusCode: 0,
-        message: 'Could not connect to $uri (${e.message})',
-      );
-    } on http.ClientException catch (e) {
-      throw ApiException(
-        statusCode: 0,
-        message: 'Could not reach $uri (${e.message})',
-      );
-    } on FormatException catch (e) {
-      throw ApiException(
-        statusCode: 0,
-        message: 'Invalid response from $uri (${e.message})',
-      );
+    for (var attempt = 0; attempt <= _maxNetworkRetries; attempt++) {
+      try {
+        return await request().timeout(_requestTimeout);
+      } on TimeoutException {
+        if (attempt < _maxNetworkRetries) {
+          await Future<void>.delayed(_retryDelay);
+          continue;
+        }
+        throw ApiException(
+          statusCode: 0,
+          message: 'Request timed out after ${_requestTimeout.inSeconds}s ($uri)',
+        );
+      } on SocketException catch (e) {
+        if (attempt < _maxNetworkRetries) {
+          await Future<void>.delayed(_retryDelay);
+          continue;
+        }
+        throw ApiException(
+          statusCode: 0,
+          message: 'Could not connect to $uri (${e.message})',
+        );
+      } on http.ClientException catch (e) {
+        throw ApiException(
+          statusCode: 0,
+          message: 'Could not reach $uri (${e.message})',
+        );
+      } on FormatException catch (e) {
+        throw ApiException(
+          statusCode: 0,
+          message: 'Invalid response from $uri (${e.message})',
+        );
+      }
     }
+
+    throw ApiException(
+      statusCode: 0,
+      message: 'Could not connect to $uri after retries',
+    );
   }
 
   dynamic _decode(http.Response response) {
