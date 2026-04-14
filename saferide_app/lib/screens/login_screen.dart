@@ -59,22 +59,18 @@ class _LoginScreenState extends State<LoginScreen>
 
   Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
+
     await context.read<AuthProvider>().loginWithEmail(
-          _emailCtrl.text.trim(),
-          _passwordCtrl.text,
-        );
+      _emailCtrl.text.trim(),
+      _passwordCtrl.text,
+    );
+
     final auth = context.read<AuthProvider>();
     if (auth.status == AuthStatus.success && mounted) {
-      // TODO: navigate to role-based dashboard
-      if (user.onboardingComplete) {
-        // Go straight to dashboard
-        Navigator.pushReplacement(context,
-          MaterialPageRoute(builder: (_) => const DashboardScreen()));
-      } else {
-        // First time — go to onboarding
-        Navigator.pushReplacement(context,
-          MaterialPageRoute(builder: (_) => const OnboardingStep1Screen()));
-      }
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const DashboardScreen()),
+        (route) => false,
+      );
     }
   }
 

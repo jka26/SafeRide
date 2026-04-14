@@ -1,146 +1,213 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import '../models/user_model.dart';
-import '../services/auth_service.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+import '../api/api_config.dart';
 
 enum UserRole { parent, driver, admin }
-enum AuthMethod { emailPassword, phoneOtp }
+
 enum AuthStatus { idle, loading, success, error }
 
-class AuthProvider extends ChangeNotifier {
-  AuthProvider({AuthService? authService})
-      : _authService = authService ?? AuthService();
+class AuthenticatedUser {
+  final String id;
+  final String email;
+  final String role;
+  final String fullName;
 
-  final AuthService _authService;
-  UserRole? _selectedRole;
-  UserModel? _currentUser;
-  AuthMethod _authMethod = AuthMethod.emailPassword;
+  const AuthenticatedUser({
+    required this.id,
+    required this.email,
+    required this.role,
+    required this.fullName,
+  });
+
+  factory AuthenticatedUser.fromJson(Map<String, dynamic> json) {
+    return AuthenticatedUser(
+      id: json['id'] ?? '',
+      email: json['email'] ?? '',
+      role: json['role'] ?? 'parent',
+      fullName: json['fullName'] ?? '',
+    );
+  }
+
+  UserRole get userRole {
+    switch (role) {
+      case 'driver': return UserRole.driver;
+      case 'admin':  return UserRole.admin;
+      default:       return UserRole.parent;
+    }
+  }
+}
+
+class AuthProvider extends ChangeNotifier {
   AuthStatus _status = AuthStatus.idle;
   String? _errorMessage;
-  bool _isOtpSent = false;
-  String? _phoneNumber;
+  AuthenticatedUser? _currentUser;
+  String? _sessionToken;
 
-  // Getters
-  UserRole? get selectedRole => _selectedRole;
-  UserModel? get currentUser => _currentUser;
-  AuthMethod get authMethod => _authMethod;
+  // ── Getters ────────────────────────────────────────────────
   AuthStatus get status => _status;
   String? get errorMessage => _errorMessage;
-  bool get isOtpSent => _isOtpSent;
-  String? get phoneNumber => _phoneNumber;
+  AuthenticatedUser? get currentUser => _currentUser;
+  String? get sessionToken => _sessionToken;
   bool get isLoading => _status == AuthStatus.loading;
   bool get hasError => _status == AuthStatus.error;
+  bool get isAuthenticated => _sessionToken != null && _currentUser != null;
 
-  // Role selection
-  void selectRole(UserRole role) {
-    _selectedRole = role;
-    notifyListeners();
+  // Convenience getter — used by DashboardScreen
+  UserRole? get selectedRole => _currentUser?.userRole;
+
+  // ── Persist session to local storage ──────────────────────
+  Future<void> _saveSession(String token) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('session_token', token);
   }
 
-  // Auth method toggle
-  void switchAuthMethod(AuthMethod method) {
-    _authMethod = method;
-    _isOtpSent = false;
-    _errorMessage = null;
-    _status = AuthStatus.idle;
-    notifyListeners();
+  Future<void> _clearSession() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('session_token');
   }
 
-  // Restore session from persisted token
-  Future<bool> tryRestoreSession() async {
+  /// Call this on app start to restore a saved session.
+  /// Returns true if a valid session was found, false otherwise.
+  Future<bool> restoreSession() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getString('session_token');
+    if (saved == null || saved.isEmpty) return false;
+
     try {
-      _currentUser = await _authService.me();
-      _selectedRole = _roleFromString(_currentUser?.role);
-      _status = AuthStatus.success;
-      notifyListeners();
-      return true;
+      final response = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}/auth/me'),
+        headers: {
+          'Authorization': 'Bearer $saved',
+          'Content-Type': 'application/json',
+        },
+      );
+      if (response.statusCode == 200) {
+        final json = jsonDecode(response.body) as Map<String, dynamic>;
+        _currentUser = AuthenticatedUser.fromJson(json);
+        _sessionToken = saved;
+        _status = AuthStatus.success;
+        notifyListeners();
+        return true;
+      } else {
+        // Token expired or invalid — clear it
+        await _clearSession();
+        return false;
+      }
     } catch (_) {
-      await _authService.logout();
+      await _clearSession();
       return false;
     }
   }
 
-  // Email / Password login
-  Future<void> loginWithEmail(String email, String password) async {
-    _setLoading();
-    try {
-      _currentUser = await _authService.login(email: email, password: password);
-      _selectedRole = _roleFromString(_currentUser?.role);
-      _status = AuthStatus.success;
-      _errorMessage = null;
-    } catch (e) {
-      _setError(e.toString());
-    }
-    notifyListeners();
-  }
-
-  // Sign up
-  Future<void> signUpWithEmail(
-    String email,
-    String password, {
+  // ── Sign Up ────────────────────────────────────────────────
+  // Backend expects: { email, password, role, fullName }
+  Future<void> signUp({
+    required String email,
+    required String password,
     required String fullName,
+    required String role, // 'parent' or 'driver'
   }) async {
     _setLoading();
+
     try {
-      _currentUser = await _authService.signUp(
-        email: email,
-        password: password,
-        fullName: fullName,
-        role: (_selectedRole ?? UserRole.parent).name,
+      final response = await http.post(
+        Uri.parse('${ApiConfig.baseUrl}/auth/signup'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'email': email,
+          'password': password,
+          'fullName': fullName,
+          'role': role,
+        }),
       );
-      _selectedRole = _roleFromString(_currentUser?.role);
-      _status = AuthStatus.success;
-      _errorMessage = null;
+
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        _sessionToken = body['token'];
+        _currentUser = AuthenticatedUser.fromJson(body['user']);
+        await _saveSession(_sessionToken!);
+        _status = AuthStatus.success;
+        _errorMessage = null;
+      } else {
+        // Backend error — e.g. 409 ConflictException "Email already in use"
+        _setError(body['message'] ?? 'Sign up failed. Please try again.');
+      }
     } catch (e) {
-      _setError(e.toString());
+      _setError('Could not connect to server. Check your connection.');
     }
+
     notifyListeners();
   }
 
-  // Phone OTP
-  Future<void> sendOtp(String phone) async {
+  // ── Login ──────────────────────────────────────────────────
+  // Backend expects: { email, password }
+  Future<void> loginWithEmail(String email, String password) async {
     _setLoading();
-    await Future.delayed(const Duration(seconds: 1));
 
-    _phoneNumber = phone;
-    _isOtpSent = true;
-    _status = AuthStatus.idle;
-    _errorMessage = null;
-    notifyListeners();
-  }
+    try {
+      final response = await http.post(
+        Uri.parse('${ApiConfig.baseUrl}/auth/login'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'email': email,
+          'password': password,
+        }),
+      );
 
-  Future<void> verifyOtp(String otp) async {
-    _setLoading();
-    await Future.delayed(const Duration(seconds: 2));
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
 
-    if (otp == '123456') {
-      _status = AuthStatus.success;
-      _errorMessage = null;
-    } else {
-      _setError('Invalid OTP. Please check and try again.');
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        _sessionToken = body['token'];
+        _currentUser = AuthenticatedUser.fromJson(body['user']);
+        await _saveSession(_sessionToken!);
+        _status = AuthStatus.success;
+        _errorMessage = null;
+      } else {
+        // 401 UnauthorizedException "Invalid credentials"
+        _setError(body['message'] ?? 'Invalid email or password.');
+      }
+    } catch (e) {
+      _setError('Could not connect to server. Check your connection.');
     }
+
     notifyListeners();
   }
 
-  // Sign out
+  // ── Logout ─────────────────────────────────────────────────
   Future<void> signOut() async {
-    await _authService.logout();
-    _selectedRole = null;
+    if (_sessionToken != null) {
+      try {
+        // Tell the backend to delete the session from the DB
+        await http.post(
+          Uri.parse('${ApiConfig.baseUrl}/auth/logout'),
+          headers: {
+            'Authorization': 'Bearer $_sessionToken',
+            'Content-Type': 'application/json',
+          },
+        );
+      } catch (_) {
+        // Even if the server call fails, clear local state
+      }
+    }
+
+    _sessionToken = null;
     _currentUser = null;
     _status = AuthStatus.idle;
     _errorMessage = null;
-    _isOtpSent = false;
-    _phoneNumber = null;
+    await _clearSession();
     notifyListeners();
   }
 
-  // Clear error
+  // ── Helpers ────────────────────────────────────────────────
   void clearError() {
     _errorMessage = null;
     _status = AuthStatus.idle;
     notifyListeners();
   }
 
-  // Private helpers
   void _setLoading() {
     _status = AuthStatus.loading;
     _errorMessage = null;
@@ -150,18 +217,5 @@ class AuthProvider extends ChangeNotifier {
   void _setError(String message) {
     _status = AuthStatus.error;
     _errorMessage = message;
-  }
-
-  UserRole? _roleFromString(String? role) {
-    switch ((role ?? '').toUpperCase()) {
-      case 'ADMIN':
-        return UserRole.admin;
-      case 'DRIVER':
-        return UserRole.driver;
-      case 'PARENT':
-        return UserRole.parent;
-      default:
-        return null;
-    }
   }
 }

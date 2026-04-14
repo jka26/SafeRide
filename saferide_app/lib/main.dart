@@ -6,6 +6,7 @@ import 'providers/auth_provider.dart';
 import 'providers/dashboard_provider.dart';
 import 'providers/csv_upload_provider.dart';
 import 'providers/onboarding_provider.dart';
+import 'theme/app_theme.dart';
 import 'screens/welcome_screen.dart';
 import 'screens/dashboard/dashboard_screen.dart';
 
@@ -47,13 +48,11 @@ class _SafeRideAppState extends State<SafeRideApp> {
   }
 
   Future<void> _initialize() async {
-    // Splash is already removed after 3s — try to restore the session in the meantime
     final token = SessionStore.instance.token;
 
     if (token != null && token.isNotEmpty) {
-      // Verify the saved token is still valid by fetching the current user
-      final restored =
-          await context.read<AuthProvider>().tryRestoreSession();
+      // Verify the saved token is still valid by calling GET /auth/me
+      final restored = await context.read<AuthProvider>().restoreSession();
       setState(() {
         _hasSession = restored;
         _ready = true;
@@ -65,6 +64,7 @@ class _SafeRideAppState extends State<SafeRideApp> {
       });
     }
 
+    // Keep native splash visible for at least 2 seconds
     await Future.delayed(const Duration(seconds: 2));
     FlutterNativeSplash.remove();
   }
@@ -72,7 +72,7 @@ class _SafeRideAppState extends State<SafeRideApp> {
   @override
   Widget build(BuildContext context) {
     if (!_ready) {
-      // Still checking session — keep splash visible via a blank scaffold
+      // Still checking session — keep splash visible via blank scaffold
       return const MaterialApp(
         debugShowCheckedModeBanner: false,
         home: Scaffold(body: SizedBox.shrink()),
@@ -80,8 +80,12 @@ class _SafeRideAppState extends State<SafeRideApp> {
     }
 
     return MaterialApp(
+      title: 'SafeRide School',
       debugShowCheckedModeBanner: false,
-      home: _hasSession ? const DashboardScreen() : const WelcomeScreen(),
+      theme: AppTheme.lightTheme,      // ← colours, fonts, button styles
+      home: _hasSession
+          ? const DashboardScreen()   // ← returning user
+          : const WelcomeScreen(),    // ← new / logged out user
     );
   }
 }
