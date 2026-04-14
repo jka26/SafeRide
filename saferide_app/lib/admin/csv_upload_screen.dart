@@ -588,55 +588,6 @@ class _SectionLabel extends StatelessWidget {
   }
 }
 
-class _DropdownField extends StatelessWidget {
-  final String hint;
-  final IconData icon;
-  final String? value;
-  final List<String> items;
-  final Function(String?) onChanged;
-
-  const _DropdownField({
-    required this.hint,
-    required this.icon,
-    required this.value,
-    required this.items,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.divider),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          isExpanded: true,
-          value: value,
-          hint: Row(children: [
-            Icon(icon, size: 16, color: AppColors.textSecondary),
-            const SizedBox(width: 8),
-            Text(hint, style: const TextStyle(fontFamily: 'Outfit',
-              fontSize: 14, color: AppColors.textHint)),
-          ]),
-          icon: const Icon(Icons.keyboard_arrow_down_rounded,
-              color: AppColors.textSecondary),
-          style: const TextStyle(fontFamily: 'Outfit', fontSize: 14,
-            color: AppColors.textPrimary),
-          items: items.map((item) => DropdownMenuItem(
-            value: item,
-            child: Text(item),
-          )).toList(),
-          onChanged: onChanged,
-        ),
-      ),
-    );
-  }
-}
-
 class _CountBadge extends StatelessWidget {
   final int count;
   final String label;

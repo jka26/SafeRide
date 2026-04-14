@@ -6,9 +6,24 @@ import '../../models/notification_model.dart';
 import '../../notifications/notification_screen.dart';
 import '../../maps/live_map_screen.dart';
 import '../../shared/placeholder_screen.dart';
+import '../../widgets/logout_button.dart';
 
-class ParentDashboard extends StatelessWidget {
+class ParentDashboard extends StatefulWidget {
   const ParentDashboard({super.key});
+
+  @override
+  State<ParentDashboard> createState() => _ParentDashboardState();
+}
+
+class _ParentDashboardState extends State<ParentDashboard> {
+  @override
+  void initState() {
+    super.initState();
+    // Load parent data as soon as this screen opens
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<DashboardProvider>().loadDashboard('parent');
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -16,6 +31,18 @@ class ParentDashboard extends StatelessWidget {
     final child = dashboard.child;
     final trip = dashboard.activeTrip;
     final notifications = dashboard.notifications;
+
+    // Show loading spinner while data loads
+    if (dashboard.isLoading) {
+      return const Scaffold(
+        backgroundColor: AppColors.background,
+        body: Center(
+          child: CircularProgressIndicator(
+            color: AppColors.primary,
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -68,23 +95,29 @@ class _ParentAppBar extends StatelessWidget {
                 style: TextStyle(fontFamily: 'Outfit', fontSize: 12, color: Colors.white60)),
             ],
           ),
-          GestureDetector(
-            onTap: () => Navigator.of(context).push(MaterialPageRoute(
-              builder: (_) => const NotificationsScreen(),
-            )),
-            child: Stack(
-              children: [
-                const Icon(Icons.notifications_outlined, color: Colors.white, size: 26),
-                Positioned(
-                  right: 0, top: 0,
-                  child: Container(
-                    width: 8, height: 8,
-                    decoration: const BoxDecoration(
-                      color: AppColors.accent, shape: BoxShape.circle),
-                  ),
+          Row(
+            children: [
+              GestureDetector(
+                onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => const NotificationsScreen(),
+                )),
+                child: Stack(
+                  children: [
+                    const Icon(Icons.notifications_outlined, color: Colors.white, size: 26),
+                    Positioned(
+                      right: 0, top: 0,
+                      child: Container(
+                        width: 8, height: 8,
+                        decoration: const BoxDecoration(
+                          color: AppColors.accent, shape: BoxShape.circle),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 8),
+              const LogoutButton(),
+            ],
           ),
         ],
       ),
