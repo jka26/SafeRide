@@ -22,9 +22,11 @@ export class CsvImportService {
 
   previewStudentsCsv(dto: ImportStudentsCsvDto) {
     const rows = this.parseRows(dto.csvText);
+    const limit = dto.previewLimit ?? 200;
     return {
       totalRows: rows.length,
-      rows,
+      previewCount: Math.min(rows.length, limit),
+      rows: rows.slice(0, limit),
     };
   }
 

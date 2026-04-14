@@ -328,6 +328,26 @@ class _PreviewView extends StatelessWidget {
             ],
           ),
         ),
+        if (provider.hasPreviewTruncation)
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFF6D28D9).withOpacity(0.08),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFF6D28D9).withOpacity(0.2)),
+            ),
+            child: Text(
+              'Showing first ${provider.previewCount} of ${provider.totalRows} rows to keep preview fast. Full file will still upload.',
+              style: const TextStyle(
+                fontFamily: 'Outfit',
+                fontSize: 11,
+                color: Color(0xFF6D28D9),
+                height: 1.4,
+              ),
+            ),
+          ),
 
         const Divider(height: 1, color: AppColors.divider),
 

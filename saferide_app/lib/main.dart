@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:provider/provider.dart';
 import 'api/session_store.dart';
@@ -6,6 +7,7 @@ import 'providers/auth_provider.dart';
 import 'providers/dashboard_provider.dart';
 import 'providers/csv_upload_provider.dart';
 import 'providers/onboarding_provider.dart';
+import 'services/push_notification_service.dart';
 import 'theme/app_theme.dart';
 import 'screens/welcome_screen.dart';
 import 'screens/dashboard/dashboard_screen.dart';
@@ -17,6 +19,8 @@ void main() async {
 
   // Restore persisted session token before the app renders anything
   await SessionStore.instance.load();
+  await Firebase.initializeApp();
+  await PushNotificationService().initialize();
 
   runApp(
     MultiProvider(

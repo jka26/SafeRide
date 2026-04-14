@@ -15,6 +15,8 @@ class CsvUploadProvider extends ChangeNotifier {
   String? _fileName;
   String? _errorMessage;
   int _uploadedCount = 0;
+  int _totalRows = 0;
+  int _previewCount = 0;
 
   // ── Getters ────────────────────────────────────────────────
   UploadStatus get status => _status;
@@ -26,6 +28,9 @@ class CsvUploadProvider extends ChangeNotifier {
   String? get fileName => _fileName;
   String? get errorMessage => _errorMessage;
   int get uploadedCount => _uploadedCount;
+  int get totalRows => _totalRows;
+  int get previewCount => _previewCount;
+  bool get hasPreviewTruncation => _totalRows > _previewCount;
   bool get isPreviewing => _status == UploadStatus.previewing;
   bool get isUploading => _status == UploadStatus.uploading;
   bool get isSuccess => _status == UploadStatus.success;
@@ -42,6 +47,8 @@ class CsvUploadProvider extends ChangeNotifier {
     try {
       final preview = await _csvImportService.preview(csvText);
       _students = preview.rows;
+      _totalRows = preview.totalRows;
+      _previewCount = preview.previewCount;
       _status = UploadStatus.previewing;
     } catch (e) {
       _status = UploadStatus.error;
@@ -79,6 +86,8 @@ class CsvUploadProvider extends ChangeNotifier {
     _fileName = null;
     _errorMessage = null;
     _uploadedCount = 0;
+    _totalRows = 0;
+    _previewCount = 0;
     notifyListeners();
   }
 }

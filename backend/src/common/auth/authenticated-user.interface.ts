@@ -5,5 +5,5 @@ export type AuthenticatedUser = {
   email: string;
   role: AppRole;
   fullName: string;
-  onboardingCompleted: boolean;
+  onboardingCompleted?: boolean;
 };

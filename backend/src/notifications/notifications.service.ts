@@ -4,10 +4,19 @@ import { CreateNotificationDto } from './dto/create-notification.dto';
 import { AppRole } from '../common/auth/roles.enum';
 import type { AuthenticatedUser } from '../common/auth/authenticated-user.interface';
 import { ReportEmergencyDto } from './dto/report-emergency.dto';
+import { RegisterDeviceTokenDto } from './dto/register-device-token.dto';
+import { PushService } from './push.service';
 
 @Injectable()
 export class NotificationsService {
-    constructor(private readonly prisma: PrismaService) { }
+    constructor(
+        private readonly prisma: PrismaService,
+        private readonly pushService: PushService,
+    ) { }
+
+    registerDeviceToken(dto: RegisterDeviceTokenDto, actor: AuthenticatedUser) {
+        return this.pushService.registerToken(actor.id, dto.token.trim(), dto.platform);
+    }
 
     /**
      * Create a notification. Only ADMIN is allowed.
@@ -29,7 +38,7 @@ export class NotificationsService {
             }
         }
 
-        return this.prisma.notification.create({
+        const created = await this.prisma.notification.create({
             data: {
                 title: dto.title,
                 body: dto.body,
@@ -37,6 +46,21 @@ export class NotificationsService {
                 targetRole: dto.targetRole ?? null,
             },
         });
+
+        if (dto.targetRole) {
+            await this.pushService.sendToRole(dto.targetRole as AppRole, dto.title, dto.body);
+        }
+        if (dto.studentId) {
+            const student = await this.prisma.student.findUnique({
+                where: { id: dto.studentId },
+                select: { parent: { select: { userId: true } } },
+            });
+            const parentUserId = student?.parent?.userId;
+            if (parentUserId) {
+                await this.pushService.sendToUsers([parentUserId], dto.title, dto.body);
+            }
+        }
+        return created;
     }
 
     /**
@@ -190,12 +214,18 @@ export class NotificationsService {
                 : '';
         const tripLabel = dto.tripId ? ` [trip:${dto.tripId}]` : '';
 
-        return this.prisma.notification.create({
+        const created = await this.prisma.notification.create({
             data: {
                 title: `Emergency Alert: ${typeLabel}`,
                 body: `Reported by ${actor.email}${tripLabel}${locationLabel}`,
                 targetRole: 'ADMIN',
             },
         });
+        await this.pushService.sendToRole(
+            AppRole.ADMIN,
+            created.title,
+            created.body,
+        );
+        return created;
     }
 }

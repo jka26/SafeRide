@@ -7,10 +7,14 @@ import { PrismaService } from '../database/prisma.service';
 import { MarkAttendanceDto } from './dto/mark-attendance.dto';
 import { AppRole } from '../common/auth/roles.enum';
 import type { AuthenticatedUser } from '../common/auth/authenticated-user.interface';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class AttendanceService {
-    constructor(private readonly prisma: PrismaService) { }
+    constructor(
+        private readonly prisma: PrismaService,
+        private readonly notificationsService: NotificationsService,
+    ) { }
 
     /**
      * Mark or upsert attendance for a student on a trip.
@@ -46,7 +50,7 @@ export class AttendanceService {
         }
 
         // Upsert so calling the endpoint twice is idempotent
-        return this.prisma.attendance.upsert({
+        const attendance = await this.prisma.attendance.upsert({
             where: {
                 studentId_tripId: {
                     studentId: dto.studentId,
@@ -69,6 +73,8 @@ export class AttendanceService {
                 trip: { select: { id: true, name: true, tripDate: true } },
             },
         });
+        await this.sendParentAttendanceAlert(attendance.student.id, attendance.student.fullName, attendance.status);
+        return attendance;
     }
 
     /**
@@ -142,5 +148,29 @@ export class AttendanceService {
             },
             orderBy: { markedAt: 'desc' },
         });
+    }
+
+    private async sendParentAttendanceAlert(
+        studentId: string,
+        studentName: string,
+        status: string,
+    ) {
+        const statusLabel = status.toUpperCase();
+        const title = 'Student Attendance Update';
+        const body = `${studentName} marked as ${statusLabel}.`;
+        await this.notificationsService.create(
+            {
+                title,
+                body,
+                studentId,
+            },
+            {
+                id: 'system',
+                email: 'system@saferide.local',
+                role: AppRole.ADMIN,
+                fullName: 'System',
+                onboardingCompleted: true,
+            },
+        );
     }
 }
