@@ -62,3 +62,39 @@ class _FadeSlideInState extends State<FadeSlideIn>
     );
   }
 }
+
+class TapScale extends StatefulWidget {
+  const TapScale({
+    super.key,
+    required this.child,
+    this.onTap,
+    this.scaleDown = 0.97,
+  });
+
+  final Widget child;
+  final VoidCallback? onTap;
+  final double scaleDown;
+
+  @override
+  State<TapScale> createState() => _TapScaleState();
+}
+
+class _TapScaleState extends State<TapScale> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: widget.onTap,
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) => setState(() => _pressed = false),
+      onTapCancel: () => setState(() => _pressed = false),
+      child: AnimatedScale(
+        duration: AppMotion.fast,
+        curve: Curves.easeOut,
+        scale: _pressed ? widget.scaleDown : 1,
+        child: widget.child,
+      ),
+    );
+  }
+}

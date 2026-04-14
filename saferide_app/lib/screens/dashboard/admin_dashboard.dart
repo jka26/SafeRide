@@ -233,7 +233,7 @@ class _FleetOverview extends StatelessWidget {
               const Text('Active Fleet Status',
                 style: TextStyle(fontFamily: 'Outfit', fontSize: 15,
                   fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-              GestureDetector(
+              TapScale(
                 onTap: () => Navigator.of(context).push(MaterialPageRoute(
                   builder: (_) => FleetMapScreen(buses: buses),
                 )),
@@ -371,7 +371,7 @@ class _BusCard extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Row(children: [
-            Expanded(child: GestureDetector(
+            Expanded(child: TapScale(
               onTap: () => Navigator.of(context).push(MaterialPageRoute(
                 builder: (_) => RouteMapScreen(
                   title: 'Tracking ${bus.busNumber}',
@@ -386,7 +386,7 @@ class _BusCard extends StatelessWidget {
               ),
             )),
             const SizedBox(width: 8),
-            Expanded(child: GestureDetector(
+            Expanded(child: TapScale(
               onTap: () async {
                 try {
                   final students =

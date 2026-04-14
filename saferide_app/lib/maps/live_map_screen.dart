@@ -3,7 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:socket_io_client/socket_io_client.dart' as io;
 import '../api/api_client.dart';
+import '../api/api_config.dart';
+import '../api/session_store.dart';
 import '../theme/app_theme.dart';
 
 class LiveMapScreen extends StatefulWidget {
@@ -22,6 +25,7 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
 
   final ApiClient _apiClient = ApiClient();
   Timer? _pollTimer;
+  io.Socket? _socket;
 
   bool _isLoading = true;
   String? _error;
@@ -34,6 +38,7 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
   @override
   void initState() {
     super.initState();
+    _connectToLiveUpdates();
     _refresh();
     _pollTimer = Timer.periodic(_pollInterval, (_) => _refresh());
   }
@@ -41,7 +46,58 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
   @override
   void dispose() {
     _pollTimer?.cancel();
+    _socket?.disconnect();
+    _socket?.dispose();
     super.dispose();
+  }
+
+  void _connectToLiveUpdates() {
+    final token = SessionStore.instance.token;
+    if (token == null || token.isEmpty) {
+      return;
+    }
+    final baseUri = Uri.parse(ApiConfig.baseUrl);
+    final socketBaseUri = Uri(
+      scheme: baseUri.scheme,
+      host: baseUri.host,
+      port: baseUri.hasPort ? baseUri.port : null,
+    );
+    final socket = io.io(
+      '${socketBaseUri.toString()}/tracking',
+      io.OptionBuilder()
+          .setTransports(['websocket'])
+          .disableAutoConnect()
+          .enableForceNew()
+          .setAuth({'token': token})
+          .build(),
+    );
+
+    socket.onConnect((_) {
+      socket.emit('subscribe', {'tripId': widget.tripId});
+    });
+
+    socket.on('location', (payload) {
+      if (!mounted || payload is! Map<String, dynamic>) {
+        return;
+      }
+      final eventTripId = (payload['tripId'] ?? '').toString();
+      if (eventTripId != widget.tripId) {
+        return;
+      }
+      final latitude = (payload['latitude'] as num?)?.toDouble();
+      final longitude = (payload['longitude'] as num?)?.toDouble();
+      if (latitude == null || longitude == null) {
+        return;
+      }
+      setState(() {
+        _busLocation = LatLng(latitude, longitude);
+        _error = null;
+        _isLoading = false;
+      });
+    });
+
+    socket.connect();
+    _socket = socket;
   }
 
   Future<void> _refresh() async {

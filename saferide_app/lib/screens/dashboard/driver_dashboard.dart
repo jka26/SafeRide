@@ -156,7 +156,7 @@ class _TripStatusCard extends StatelessWidget {
           Text('Trip status: ${tripStatus.toUpperCase()}',
             style: const TextStyle(fontFamily: 'Outfit', fontSize: 12, color: AppColors.textSecondary)),
           const SizedBox(height: 14),
-          GestureDetector(
+          TapScale(
             onTap: canToggle ? onToggle : null,
             child: Container(
               width: double.infinity, height: 48,
@@ -392,7 +392,7 @@ class _StudentRow extends StatelessWidget {
             const SizedBox(height: 10),
             const Divider(color: AppColors.divider, height: 1),
             const SizedBox(height: 8),
-            GestureDetector(
+            TapScale(
               onTap: () => context
                   .read<DashboardProvider>()
                   .updateStudentStatus(student.id, 'pending'),
@@ -460,7 +460,7 @@ class _ToggleButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return TapScale(
       onTap: onTap,
       child: Container(
         height: 36,
@@ -486,6 +486,8 @@ class _ToggleButton extends StatelessWidget {
 // Quick actions
 
 class _QuickActions extends StatelessWidget {
+  const _QuickActions();
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -502,7 +504,7 @@ class _QuickActions extends StatelessWidget {
             style: TextStyle(fontFamily: 'Outfit', fontSize: 15,
               fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
           const SizedBox(height: 12),
-          GestureDetector(
+          TapScale(
             onTap: () => Navigator.of(context).push(MaterialPageRoute(
               builder: (_) => const RouteMapScreen(
                 title: 'Full Route',
@@ -516,7 +518,7 @@ class _QuickActions extends StatelessWidget {
             ),
           ),
           const Divider(color: AppColors.divider, height: 1),
-          GestureDetector(
+          TapScale(
             onTap: () => Navigator.of(context).push(MaterialPageRoute(
               builder: (_) => const EmergencyScreen(),
             )),

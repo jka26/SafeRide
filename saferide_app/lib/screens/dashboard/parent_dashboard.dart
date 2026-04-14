@@ -24,6 +24,7 @@ class _ParentDashboardState extends State<ParentDashboard> {
     final child = dashboard.child;
     final trip = dashboard.activeTrip;
     final notifications = dashboard.notifications;
+    final children = dashboard.children;
 
     // Show loading spinner while data loads
     if (dashboard.isLoading) {
@@ -44,7 +45,13 @@ class _ParentDashboardState extends State<ParentDashboard> {
         children: [
           if (child != null)
             FadeSlideIn(
-              child: _ChildCard(child: child, trip: trip),
+              child: _ChildCard(
+                child: child,
+                trip: trip,
+                children: children,
+                selectedIndex: dashboard.selectedChildIndex,
+                onSelectChild: (index) => context.read<DashboardProvider>().selectChild(index),
+              ),
             ),
           if (child != null) const SizedBox(height: 14),
           if (trip != null)
@@ -74,6 +81,7 @@ class _ParentAppBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final unread = context.watch<DashboardProvider>().unreadNotifications;
     return Container(
       padding: EdgeInsets.only(
         top: MediaQuery.of(context).padding.top + 10,
@@ -95,21 +103,24 @@ class _ParentAppBar extends StatelessWidget {
           ),
           Row(
             children: [
-              GestureDetector(
+              TapScale(
                 onTap: () => Navigator.of(context).push(MaterialPageRoute(
                   builder: (_) => const NotificationsScreen(),
                 )),
                 child: Stack(
                   children: [
                     const Icon(Icons.notifications_outlined, color: Colors.white, size: 26),
-                    Positioned(
-                      right: 0, top: 0,
-                      child: Container(
-                        width: 8, height: 8,
-                        decoration: const BoxDecoration(
-                          color: AppColors.accent, shape: BoxShape.circle),
+                    if (unread > 0)
+                      Positioned(
+                        right: 0,
+                        top: 0,
+                        child: Container(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(
+                              color: AppColors.accent, shape: BoxShape.circle),
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ),
@@ -126,7 +137,16 @@ class _ParentAppBar extends StatelessWidget {
 class _ChildCard extends StatelessWidget {
   final child;
   final trip;
-  const _ChildCard({required this.child, required this.trip});
+  final List children;
+  final int selectedIndex;
+  final ValueChanged<int> onSelectChild;
+  const _ChildCard({
+    required this.child,
+    required this.trip,
+    required this.children,
+    required this.selectedIndex,
+    required this.onSelectChild,
+  });
 
   String get _statusLabel {
     switch (trip?.status) {
@@ -163,7 +183,45 @@ class _ChildCard extends StatelessWidget {
     return DashboardCard(
       child: Column(
         children: [
-          GestureDetector(
+          if (children.length > 1)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: List.generate(children.length, (index) {
+                    final c = children[index];
+                    final active = index == selectedIndex;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: TapScale(
+                        onTap: () => onSelectChild(index),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: active ? AppColors.primaryLight : AppColors.surfaceVariant,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: active ? AppColors.primaryLight : AppColors.divider,
+                            ),
+                          ),
+                          child: Text(
+                            c.name.toString(),
+                            style: TextStyle(
+                              fontFamily: 'Outfit',
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: active ? Colors.white : AppColors.textPrimary,
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+              ),
+            ),
+          TapScale(
             onTap: () => Navigator.of(context).push(MaterialPageRoute(
               builder: (_) => const PlaceholderScreen(
                 title: 'Child Details',
@@ -323,7 +381,7 @@ class _LiveTrackingCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
-          GestureDetector(
+          TapScale(
             onTap: () => Navigator.of(context).push(MaterialPageRoute(
               builder: (_) => LiveMapScreen(tripId: trip.id),
             )),
@@ -450,7 +508,7 @@ class _NotificationsCard extends StatelessWidget {
           SectionHeader(
             title: 'Recent Notifications',
             subtitle: 'Latest alerts and updates',
-            trailing: GestureDetector(
+            trailing: TapScale(
               onTap: () => Navigator.of(context).push(MaterialPageRoute(
                 builder: (_) => const NotificationsScreen(),
               )),
