@@ -1,5 +1,34 @@
 import 'trip_model.dart';
 
+class StudentSearchResult {
+  final String id;
+  final String studentCode;
+  final String fullName;
+  final String grade;
+  final String? routeName;
+  final String? busLabel;
+
+  const StudentSearchResult({
+    required this.id,
+    required this.studentCode,
+    required this.fullName,
+    required this.grade,
+    this.routeName,
+    this.busLabel,
+  });
+
+  factory StudentSearchResult.fromJson(Map<String, dynamic> json) {
+    return StudentSearchResult(
+      id: json['id'] as String,
+      studentCode: json['studentCode'] as String,
+      fullName: json['fullName'] as String,
+      grade: json['grade'] as String,
+      routeName: json['routeName'] as String?,
+      busLabel: json['busLabel'] as String?,
+    );
+  }
+}
+
 class StudentModel {
   final String id;
   final String name;
