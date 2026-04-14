@@ -34,7 +34,21 @@ class BusModel {
       totalStudents: attendanceCount,
       studentsOnBoard: attendanceCount,
       routeProgress: 0,
-      status: 'active',
+      status: _statusFromTrip((json['status'] ?? '').toString()),
     );
+  }
+
+  static String _statusFromTrip(String status) {
+    switch (status.toUpperCase()) {
+      case 'IN_PROGRESS':
+        return 'active';
+      case 'COMPLETED':
+        return 'completed';
+      case 'CANCELLED':
+        return 'idle';
+      case 'SCHEDULED':
+      default:
+        return 'idle';
+    }
   }
 }

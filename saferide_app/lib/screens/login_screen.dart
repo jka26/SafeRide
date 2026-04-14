@@ -5,7 +5,6 @@ import '../../theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
 import 'signup_screen.dart';
 import 'dashboard/dashboard_screen.dart';
-import '../screens/onboarding_step1_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -239,8 +238,8 @@ class _LoginScreenState extends State<LoginScreen>
                                 validator: (v) {
                                   if (v == null || v.isEmpty)
                                     return 'Password is required';
-                                  if (v.length < 6)
-                                    return 'Minimum 6 characters';
+                                  if (v.length < 8)
+                                    return 'Minimum 8 characters';
                                   return null;
                                 },
                               ),

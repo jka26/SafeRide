@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
+import 'package:geolocator/geolocator.dart';
 import '../models/student_model.dart';
 import '../models/bus_model.dart';
 import '../models/trip_model.dart';
@@ -28,14 +31,21 @@ class DashboardProvider extends ChangeNotifier {
   final TripService _tripService;
   DashboardStatus _status = DashboardStatus.idle;
   String? _errorMessage;
+  bool _isTogglingTrip = false;
+  Timer? _locationTimer;
+  String? _locationTripId;
+  static const Duration _locationInterval = Duration(seconds: 15);
 
   // ── Shared ─────────────────────────────────────────────────
   UserModel? _currentUser;
 
   // ── Parent-specific ────────────────────────────────────────
+  List<StudentModel> _children = [];
+  int _selectedChildIndex = 0;
   StudentModel? _child;
   TripModel? _activeTrip;
   List<NotificationModel> _notifications = [];
+  int _unreadNotifications = 0;
 
   // ── Driver-specific ────────────────────────────────────────
   List<StudentModel> _students = [];
@@ -56,13 +66,16 @@ class DashboardProvider extends ChangeNotifier {
 
   UserModel? get currentUser => _currentUser;
   StudentModel? get child => _child;
+  List<StudentModel> get children => _children;
+  int get selectedChildIndex => _selectedChildIndex;
   TripModel? get activeTrip => _activeTrip;
   List<NotificationModel> get notifications => _notifications;
+  int get unreadNotifications => _unreadNotifications;
 
   List<StudentModel> get students => _students;
   bool get tripStarted => _tripStarted;
   int get checkedIn =>
-      _students.where((s) => s.status == 'boarded').length;
+      _students.where((s) => s.status == 'boarded' || s.status == 'alighted').length;
   int get pending =>
       _students.where((s) => s.status == 'pending').length;
   int get absent =>
@@ -79,6 +92,7 @@ class DashboardProvider extends ChangeNotifier {
 
   // ── Load dashboard based on role ───────────────────────────
   Future<void> loadDashboard(String role) async {
+    _resetDashboardState();
     _status = DashboardStatus.loading;
     _errorMessage = null;
     notifyListeners();
@@ -94,8 +108,10 @@ class DashboardProvider extends ChangeNotifier {
         case 'admin':
           await _loadAdminData();
           break;
+        default:
+          throw StateError('Unsupported dashboard role: $role');
       }
-      _notifications = await _notificationService.getNotifications();
+      await refreshNotifications();
       _status = DashboardStatus.loaded;
     } catch (e) {
       _status = DashboardStatus.error;
@@ -107,8 +123,9 @@ class DashboardProvider extends ChangeNotifier {
   Future<void> _loadParentData() async {
     final data = await _dashboardService.getParentDashboard();
     _currentUser = data.currentUser;
-    _child = data.children.isNotEmpty ? data.children.first : null;
-    _activeTrip = data.activeTrip;
+    _children = data.children;
+    _selectedChildIndex = 0;
+    _setSelectedChildData();
   }
 
   Future<void> _loadDriverData() async {
@@ -116,7 +133,8 @@ class DashboardProvider extends ChangeNotifier {
     _currentUser = data.currentUser;
     _students = data.students;
     _activeTrip = data.activeTrip;
-    _tripStarted = _activeTrip != null;
+    _tripStarted = _activeTrip?.status == 'active';
+    await _ensureDriverLocationSharing();
   }
 
   Future<void> _loadAdminData() async {
@@ -133,7 +151,8 @@ class DashboardProvider extends ChangeNotifier {
   // ── Driver actions ─────────────────────────────────────────
   Future<void> toggleTrip() async {
     final tripId = _activeTrip?.id;
-    if (tripId == null || tripId.isEmpty) return;
+    if (tripId == null || tripId.isEmpty || _isTogglingTrip) return;
+    _isTogglingTrip = true;
 
     try {
       if (_tripStarted) {
@@ -142,9 +161,12 @@ class DashboardProvider extends ChangeNotifier {
         await _tripService.startTrip(tripId);
       }
       _tripStarted = !_tripStarted;
+      await _ensureDriverLocationSharing();
       _errorMessage = null;
     } catch (e) {
       _errorMessage = e.toString();
+    } finally {
+      _isTogglingTrip = false;
     }
     notifyListeners();
   }
@@ -158,10 +180,17 @@ class DashboardProvider extends ChangeNotifier {
     }
 
     try {
+      final backendStatus = switch (newStatus) {
+        'absent' => AttendanceApiStatus.absent,
+        'boarded' => AttendanceApiStatus.boarded,
+        'alighted' => AttendanceApiStatus.alighted,
+        'pending' => AttendanceApiStatus.present,
+        _ => AttendanceApiStatus.present,
+      };
       await _attendanceService.markAttendance(
         studentId: studentId,
         tripId: tripId,
-        status: newStatus == 'absent' ? 'ABSENT' : 'PRESENT',
+        status: backendStatus,
       );
       _students = _students.map((s) {
         if (s.id == studentId) {
@@ -183,5 +212,115 @@ class DashboardProvider extends ChangeNotifier {
       _errorMessage = e.toString();
     }
     notifyListeners();
+  }
+
+  Future<List<StudentModel>> getBusStudents(String busId) {
+    return _dashboardService.getBusStudents(busId);
+  }
+
+  Future<void> refreshNotifications() async {
+    _notifications = await _notificationService.getNotifications();
+    _unreadNotifications = await _notificationService.getUnreadCount();
+  }
+
+  Future<void> markNotificationRead(String id) async {
+    await _notificationService.markRead(id);
+    await refreshNotifications();
+    notifyListeners();
+  }
+
+  void selectChild(int index) {
+    if (index < 0 || index >= _children.length) return;
+    _selectedChildIndex = index;
+    _setSelectedChildData();
+    notifyListeners();
+  }
+
+  void _setSelectedChildData() {
+    if (_children.isEmpty) {
+      _child = null;
+      _activeTrip = null;
+      return;
+    }
+    _child = _children[_selectedChildIndex];
+    _activeTrip = _child?.latestTrip;
+  }
+
+  void _resetDashboardState() {
+    _stopLocationSharing();
+    _currentUser = null;
+    _children = [];
+    _selectedChildIndex = 0;
+    _child = null;
+    _activeTrip = null;
+    _notifications = [];
+    _unreadNotifications = 0;
+    _students = [];
+    _tripStarted = false;
+    _buses = [];
+    _totalStudentsOnBoard = 0;
+    _activeAlerts = 0;
+    _completedTrips = 0;
+    _activeRoutes = 0;
+    _onTimeRate = 0;
+  }
+
+  Future<void> _ensureDriverLocationSharing() async {
+    final tripId = _activeTrip?.id;
+    if (!_tripStarted || tripId == null || tripId.isEmpty) {
+      _stopLocationSharing();
+      return;
+    }
+    if (_locationTripId == tripId && _locationTimer != null) {
+      return;
+    }
+    _stopLocationSharing();
+    _locationTripId = tripId;
+    await _reportCurrentLocation(tripId);
+    _locationTimer = Timer.periodic(_locationInterval, (_) {
+      _reportCurrentLocation(tripId);
+    });
+  }
+
+  Future<void> _reportCurrentLocation(String tripId) async {
+    try {
+      if (!await Geolocator.isLocationServiceEnabled()) {
+        return;
+      }
+
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        return;
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
+      );
+      await _tripService.reportLocation(
+        tripId: tripId,
+        latitude: position.latitude,
+        longitude: position.longitude,
+      );
+    } catch (e) {
+      debugPrint('Location reporting failed: $e');
+    }
+  }
+
+  void _stopLocationSharing() {
+    _locationTimer?.cancel();
+    _locationTimer = null;
+    _locationTripId = null;
+  }
+
+  @override
+  void dispose() {
+    _stopLocationSharing();
+    super.dispose();
   }
 }

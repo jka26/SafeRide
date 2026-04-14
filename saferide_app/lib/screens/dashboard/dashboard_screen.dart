@@ -16,14 +16,20 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
+  UserRole? _loadedRole;
+  String? _loadedUserId;
+
   @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final role = context.read<AuthProvider>().selectedRole;
-      final roleStr = role?.name ?? 'parent';
-      context.read<DashboardProvider>().loadDashboard(roleStr);
-    });
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final auth = context.read<AuthProvider>();
+    final role = auth.selectedRole;
+    final userId = auth.currentUser?.id;
+    if (role == null || userId == null) return;
+    if (role == _loadedRole && userId == _loadedUserId) return;
+    _loadedRole = role;
+    _loadedUserId = userId;
+    context.read<DashboardProvider>().loadDashboard(role.name);
   }
 
   @override
@@ -31,7 +37,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final role = context.watch<AuthProvider>().selectedRole;
     final dashboard = context.watch<DashboardProvider>();
 
-    if (dashboard.isLoading) {
+    if (role == null || dashboard.isLoading) {
       return const Scaffold(
         body: Center(
           child: CircularProgressIndicator(),
@@ -39,14 +45,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
       );
     }
 
+    late final Widget roleDashboard;
     switch (role) {
       case UserRole.driver:
-        return const DriverDashboard();
+        roleDashboard = const DriverDashboard();
       case UserRole.admin:
-        return const AdminDashboard();
+        roleDashboard = const AdminDashboard();
       case UserRole.parent:
       default:
-        return const ParentDashboard();
+        roleDashboard = const ParentDashboard();
     }
+
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 320),
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      child: KeyedSubtree(
+        key: ValueKey<UserRole>(role),
+        child: roleDashboard,
+      ),
+    );
   }
 }

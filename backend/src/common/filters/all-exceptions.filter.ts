@@ -6,6 +6,7 @@ import {
     HttpStatus,
     Logger,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { Request, Response } from 'express';
 
 export interface ApiErrorResponse {
@@ -48,6 +49,22 @@ export class AllExceptionsFilter implements ExceptionFilter {
                 const resObj = res as Record<string, unknown>;
                 message = (resObj.message as string | string[]) ?? message;
                 error = (resObj.error as string) ?? HttpStatus[statusCode] ?? error;
+            }
+        } else if (exception instanceof Prisma.PrismaClientKnownRequestError) {
+            if (exception.code === 'P2025') {
+                statusCode = HttpStatus.NOT_FOUND;
+                error = 'Not Found';
+                message = 'Resource not found';
+            } else if (exception.code === 'P2002') {
+                statusCode = HttpStatus.CONFLICT;
+                error = 'Conflict';
+                message = 'A record with this value already exists';
+            } else if (exception.code === 'P2003') {
+                statusCode = HttpStatus.BAD_REQUEST;
+                error = 'Bad Request';
+                message = 'Related record does not exist';
+            } else {
+                this.logger.error('Unhandled Prisma error', exception);
             }
         } else {
             this.logger.error('Unexpected exception', exception as Error);

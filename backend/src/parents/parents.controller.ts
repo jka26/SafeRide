@@ -1,4 +1,4 @@
-import { Controller, Delete, Get, Param, Post } from '@nestjs/common';
+import { BadRequestException, Controller, Delete, Get, Param, Post } from '@nestjs/common';
 import { ParentsService } from './parents.service';
 import { Roles } from '../common/auth/roles.decorator';
 import { AppRole } from '../common/auth/roles.enum';
@@ -18,6 +18,9 @@ export class ParentsController {
 
   @Get('me/students/search')
   findByCode(@Query('code') code: string) {
+    if (!code || !code.trim()) {
+      throw new BadRequestException('Query parameter "code" is required');
+    }
     return this.parentsService.findByCode(code);
   }
 

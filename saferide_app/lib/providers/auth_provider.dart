@@ -1,5 +1,4 @@
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../api/api_client.dart';
 import '../api/session_store.dart';
 
@@ -21,10 +20,14 @@ class AuthenticatedUser {
   });
 
   factory AuthenticatedUser.fromJson(Map<String, dynamic> json) {
+    final normalizedRole = (json['role'] ?? 'PARENT')
+        .toString()
+        .trim()
+        .toLowerCase();
     return AuthenticatedUser(
       id: json['id'] ?? '',
       email: json['email'] ?? '',
-      role: json['role'] ?? 'parent',
+      role: normalizedRole,
       fullName: json['fullName'] ?? '',
     );
   }
@@ -60,22 +63,10 @@ class AuthProvider extends ChangeNotifier {
   // Convenience getter — used by DashboardScreen
   UserRole? get selectedRole => _currentUser?.userRole;
 
-  // ── Persist session to local storage ──────────────────────
-  Future<void> _saveSession(String token) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('session_token', token);
-  }
-
-  Future<void> _clearSession() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('session_token');
-  }
-
   /// Call this on app start to restore a saved session.
   /// Returns true if a valid session was found, false otherwise.
   Future<bool> restoreSession() async {
-    final prefs = await SharedPreferences.getInstance();
-    final saved = prefs.getString('session_token');
+    final saved = SessionStore.instance.token;
     if (saved == null || saved.isEmpty) return false;
 
     try {
@@ -87,8 +78,11 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (_) {
-      SessionStore.instance.clear();
-      await _clearSession();
+      await SessionStore.instance.clear();
+      _sessionToken = null;
+      _currentUser = null;
+      _status = AuthStatus.idle;
+      _errorMessage = null;
       return false;
     }
   }
@@ -101,6 +95,7 @@ class AuthProvider extends ChangeNotifier {
     required String fullName,
     required String role, // 'parent' or 'driver'
   }) async {
+    if (_status == AuthStatus.loading) return;
     _setLoading();
 
     try {
@@ -110,7 +105,7 @@ class AuthProvider extends ChangeNotifier {
           'email': email,
           'password': password,
           'fullName': fullName,
-          'role': role,
+          'role': role.trim().toUpperCase(),
         },
       ) as Map<String, dynamic>;
 
@@ -119,7 +114,6 @@ class AuthProvider extends ChangeNotifier {
       _currentUser = AuthenticatedUser.fromJson(userData);
       if (_sessionToken != null && _sessionToken!.isNotEmpty) {
         SessionStore.instance.token = _sessionToken;
-        await _saveSession(_sessionToken!);
       }
       _status = AuthStatus.success;
       _errorMessage = null;
@@ -132,9 +126,23 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> signUpWithEmail(
+    String email,
+    String password, {
+    required String fullName,
+  }) {
+    return signUp(
+      email: email,
+      password: password,
+      fullName: fullName,
+      role: 'PARENT',
+    );
+  }
+
   // ── Login ──────────────────────────────────────────────────
   // Backend expects: { email, password }
   Future<void> loginWithEmail(String email, String password) async {
+    if (_status == AuthStatus.loading) return;
     _setLoading();
 
     try {
@@ -151,7 +159,6 @@ class AuthProvider extends ChangeNotifier {
       _currentUser = AuthenticatedUser.fromJson(userData);
       if (_sessionToken != null && _sessionToken!.isNotEmpty) {
         SessionStore.instance.token = _sessionToken;
-        await _saveSession(_sessionToken!);
       }
       _status = AuthStatus.success;
       _errorMessage = null;
@@ -174,12 +181,11 @@ class AuthProvider extends ChangeNotifier {
       }
     }
 
-    SessionStore.instance.clear();
+    await SessionStore.instance.clear();
     _sessionToken = null;
     _currentUser = null;
     _status = AuthStatus.idle;
     _errorMessage = null;
-    await _clearSession();
     notifyListeners();
   }
 
