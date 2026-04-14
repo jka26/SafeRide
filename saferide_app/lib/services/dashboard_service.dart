@@ -60,11 +60,22 @@ class DashboardService {
     final children = childrenJson
         .map((item) => StudentModel.fromParentDashboard(item as Map<String, dynamic>))
         .toList();
+    Map<String, dynamic>? activeTripJson;
+    for (final child in childrenJson) {
+      final childMap = child as Map<String, dynamic>;
+      final candidate = childMap['activeTrip'] as Map<String, dynamic>?;
+      if (candidate != null) {
+        activeTripJson = candidate;
+        break;
+      }
+    }
 
     return ParentDashboardData(
       currentUser: user,
       children: children,
-      activeTrip: children.isNotEmpty ? children.first.latestTrip : null,
+      activeTrip: activeTripJson != null
+          ? TripModel.fromParentActiveTrip(activeTripJson)
+          : (children.isNotEmpty ? children.first.latestTrip : null),
     );
   }
 
@@ -81,7 +92,7 @@ class DashboardService {
       );
     }
 
-    final firstTrip = todaysTrips.first as Map<String, dynamic>;
+    final firstTrip = _selectDriverTrip(todaysTrips);
     final attendances = (firstTrip['attendances'] ?? []) as List<dynamic>;
 
     return DriverDashboardData(
@@ -91,6 +102,21 @@ class DashboardService {
           .toList(),
       activeTrip: TripModel.fromDriverDashboard(firstTrip),
     );
+  }
+
+  Map<String, dynamic> _selectDriverTrip(List<dynamic> todaysTrips) {
+    final trips = todaysTrips.cast<Map<String, dynamic>>();
+    for (final trip in trips) {
+      if ((trip['status'] ?? '').toString().toUpperCase() == 'IN_PROGRESS') {
+        return trip;
+      }
+    }
+    for (final trip in trips) {
+      if ((trip['status'] ?? '').toString().toUpperCase() == 'SCHEDULED') {
+        return trip;
+      }
+    }
+    return trips.first;
   }
 
   Future<AdminDashboardData> getAdminDashboard() async {
@@ -118,6 +144,15 @@ class DashboardService {
       activeRoutes: (counts['buses'] as num?)?.toInt() ?? 0,
       onTimeRate: totalMarked == 0 ? 0 : (present / totalMarked) * 100,
     );
+  }
+
+  Future<List<StudentModel>> getBusStudents(String busId) async {
+    final response =
+        await _apiClient.get('/buses/$busId/students') as Map<String, dynamic>;
+    final studentsJson = (response['students'] ?? const <dynamic>[]) as List<dynamic>;
+    return studentsJson
+        .map((item) => StudentModel.fromBusRoster(item as Map<String, dynamic>))
+        .toList();
   }
 
   Future<UserModel> _currentUser() async {

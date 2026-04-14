@@ -83,10 +83,10 @@ class CsvStudentModel {
     return CsvStudentModel(
       name: (row['fullName'] ?? '').toString(),
       grade: (row['grade'] ?? '').toString(),
-      stopName: '',
-      dropOffTime: '',
-      emergencyContactName: '',
-      emergencyContactPhone: '',
+      stopName: (row['stopName'] ?? '').toString(),
+      dropOffTime: (row['dropOffTime'] ?? '').toString(),
+      emergencyContactName: (row['emergencyContactName'] ?? '').toString(),
+      emergencyContactPhone: (row['emergencyContactPhone'] ?? '').toString(),
     );
   }
 }

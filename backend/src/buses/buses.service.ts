@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { CreateBusDto } from './dto/create-bus.dto';
 import { UpdateBusDto } from './dto/update-bus.dto';
@@ -15,8 +15,58 @@ export class BusesService {
     return this.prisma.bus.findMany({ orderBy: { createdAt: 'desc' } });
   }
 
-  findOne(id: string) {
-    return this.prisma.bus.findUnique({ where: { id } });
+  async findOne(id: string) {
+    const bus = await this.prisma.bus.findUnique({ where: { id } });
+    if (!bus) {
+      throw new NotFoundException('Bus not found');
+    }
+    return bus;
+  }
+
+  async getBusStudents(id: string) {
+    await this.findOne(id);
+
+    const latestTrip = await this.prisma.trip.findFirst({
+      where: { busId: id },
+      orderBy: [{ tripDate: 'desc' }, { createdAt: 'desc' }],
+      include: {
+        attendances: {
+          include: {
+            student: {
+              select: {
+                id: true,
+                fullName: true,
+                grade: true,
+                stopName: true,
+                dropOffTime: true,
+              },
+            },
+          },
+          orderBy: { markedAt: 'desc' },
+        },
+      },
+    });
+
+    if (!latestTrip) {
+      return {
+        tripId: null,
+        tripStatus: null,
+        students: [],
+      };
+    }
+
+    return {
+      tripId: latestTrip.id,
+      tripStatus: latestTrip.status,
+      students: latestTrip.attendances.map((entry) => ({
+        id: entry.student.id,
+        fullName: entry.student.fullName,
+        grade: entry.student.grade,
+        stopName: entry.student.stopName,
+        dropOffTime: entry.student.dropOffTime,
+        attendanceStatus: entry.status,
+      })),
+    };
   }
 
   update(id: string, dto: UpdateBusDto) {

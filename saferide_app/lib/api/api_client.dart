@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:async';
 
 import 'package:http/http.dart' as http;
 
@@ -11,6 +12,7 @@ class ApiClient {
       : _httpClient = httpClient ?? http.Client();
 
   final http.Client _httpClient;
+  static const Duration _requestTimeout = Duration(seconds: 20);
 
   Uri _uri(String path, [Map<String, dynamic>? queryParameters]) {
     final base = ApiConfig.baseUrl.endsWith('/')
@@ -78,7 +80,12 @@ class ApiClient {
     Uri uri,
   ) async {
     try {
-      return await request();
+      return await request().timeout(_requestTimeout);
+    } on TimeoutException {
+      throw ApiException(
+        statusCode: 0,
+        message: 'Request timed out after ${_requestTimeout.inSeconds}s ($uri)',
+      );
     } on SocketException catch (e) {
       throw ApiException(
         statusCode: 0,

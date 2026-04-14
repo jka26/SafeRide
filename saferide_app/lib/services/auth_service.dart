@@ -39,7 +39,9 @@ class AuthService {
       },
     ) as Map<String, dynamic>;
 
-    return UserModel.fromJson(response);
+    SessionStore.instance.token = response['token']?.toString();
+    final user = (response['user'] ?? const <String, dynamic>{}) as Map<String, dynamic>;
+    return UserModel.fromJson(user);
   }
 
   Future<UserModel> me() async {

@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../theme/app_theme.dart';
 import '../../providers/dashboard_provider.dart';
 import '../../models/notification_model.dart';
 import '../../notifications/notification_screen.dart';
 import '../../maps/live_map_screen.dart';
 import '../../shared/placeholder_screen.dart';
+import '../../theme/app_theme.dart';
+import '../../ui/app_motion.dart';
+import '../../ui/dashboard_kit.dart';
 import '../../widgets/logout_button.dart';
 
 class ParentDashboard extends StatefulWidget {
@@ -16,15 +18,6 @@ class ParentDashboard extends StatefulWidget {
 }
 
 class _ParentDashboardState extends State<ParentDashboard> {
-  @override
-  void initState() {
-    super.initState();
-    // Load parent data as soon as this screen opens
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<DashboardProvider>().loadDashboard('parent');
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     final dashboard = context.watch<DashboardProvider>();
@@ -44,28 +37,31 @@ class _ParentDashboardState extends State<ParentDashboard> {
       );
     }
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: Column(
+    return DashboardShell(
+      header: const _ParentAppBar(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _ParentAppBar(),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (child != null) _ChildCard(child: child, trip: trip),
-                  const SizedBox(height: 14),
-                  if (trip != null) _LiveTrackingCard(trip: trip),
-                  const SizedBox(height: 14),
-                  if (trip != null) _ScheduleCard(trip: trip),
-                  const SizedBox(height: 14),
-                  _NotificationsCard(notifications: notifications),
-                  const SizedBox(height: 16),
-                ],
-              ),
+          if (child != null)
+            FadeSlideIn(
+              child: _ChildCard(child: child, trip: trip),
             ),
+          if (child != null) const SizedBox(height: 14),
+          if (trip != null)
+            FadeSlideIn(
+              delay: const Duration(milliseconds: 80),
+              child: _LiveTrackingCard(trip: trip),
+            ),
+          if (trip != null) const SizedBox(height: 14),
+          if (trip != null)
+            FadeSlideIn(
+              delay: const Duration(milliseconds: 120),
+              child: _ScheduleCard(trip: trip),
+            ),
+          if (trip != null) const SizedBox(height: 14),
+          FadeSlideIn(
+            delay: const Duration(milliseconds: 160),
+            child: _NotificationsCard(notifications: notifications),
           ),
         ],
       ),
@@ -74,6 +70,8 @@ class _ParentDashboardState extends State<ParentDashboard> {
 }
 
 class _ParentAppBar extends StatelessWidget {
+  const _ParentAppBar();
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -130,15 +128,39 @@ class _ChildCard extends StatelessWidget {
   final trip;
   const _ChildCard({required this.child, required this.trip});
 
+  String get _statusLabel {
+    switch (trip?.status) {
+      case 'active':
+        return 'On Bus';
+      case 'completed':
+        return 'Trip Completed';
+      case 'idle':
+        return 'Scheduled';
+      case 'cancelled':
+        return 'Cancelled';
+      default:
+        return 'No Active Trip';
+    }
+  }
+
+  String get _badgeLabel {
+    switch (trip?.status) {
+      case 'active':
+        return 'Active';
+      case 'completed':
+        return 'Completed';
+      case 'idle':
+        return 'Scheduled';
+      case 'cancelled':
+        return 'Cancelled';
+      default:
+        return 'Idle';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha:0.05), blurRadius: 8, offset: const Offset(0, 2))],
-      ),
+    return DashboardCard(
       child: Column(
         children: [
           GestureDetector(
@@ -192,8 +214,8 @@ class _ChildCard extends StatelessWidget {
               children: [
                 const Icon(Icons.directions_bus_rounded, color: AppColors.secondary, size: 18),
                 const SizedBox(width: 8),
-                const Expanded(
-                  child: Text('Status  On Bus',
+                Expanded(
+                  child: Text('Status  $_statusLabel',
                     style: TextStyle(fontFamily: 'Outfit', fontSize: 13,
                       fontWeight: FontWeight.w600, color: AppColors.secondary)),
                 ),
@@ -201,7 +223,7 @@ class _ChildCard extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: AppColors.secondary, borderRadius: BorderRadius.circular(20)),
-                  child: const Text('Active',
+                  child: Text(_badgeLabel,
                     style: TextStyle(fontFamily: 'Outfit', fontSize: 11,
                       fontWeight: FontWeight.w700, color: Colors.white)),
                 ),
@@ -255,24 +277,19 @@ class _LiveTrackingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha:0.05), blurRadius: 8, offset: const Offset(0, 2))],
-      ),
+    return DashboardCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
-            children: [
-              Icon(Icons.location_on_rounded, color: AppColors.accent, size: 18),
-              SizedBox(width: 6),
-              Text('Live Tracking',
-                style: TextStyle(fontFamily: 'Outfit', fontSize: 15,
-                  fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-            ],
+          SectionHeader(
+            title: 'Live Tracking',
+            subtitle: 'Bus location and ETA',
+            trailing: StatusPill(
+              label: trip.status.toString().toUpperCase(),
+              color: trip.status == 'active'
+                  ? AppColors.secondary
+                  : AppColors.primaryLight,
+            ),
           ),
           const SizedBox(height: 14),
           Row(
@@ -295,7 +312,10 @@ class _LiveTrackingCard extends StatelessWidget {
                   const Text('Current Stop',
                     style: TextStyle(fontFamily: 'Outfit', fontSize: 12, color: AppColors.textSecondary)),
                   const SizedBox(height: 2),
-                  Text('${trip.currentStop} of ${trip.totalStops}',
+                  Text(
+                    (trip.totalStops > 0)
+                        ? '${trip.currentStop ?? '--'} of ${trip.totalStops}'
+                        : (trip.currentStop ?? '--'),
                     style: const TextStyle(fontFamily: 'Outfit', fontSize: 14,
                       fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
                 ],
@@ -305,7 +325,7 @@ class _LiveTrackingCard extends StatelessWidget {
           const SizedBox(height: 14),
           GestureDetector(
             onTap: () => Navigator.of(context).push(MaterialPageRoute(
-              builder: (_) => const LiveMapScreen(),
+              builder: (_) => LiveMapScreen(tripId: trip.id),
             )),
             child: Container(
               width: double.infinity,
@@ -336,33 +356,36 @@ class _ScheduleCard extends StatelessWidget {
   final trip;
   const _ScheduleCard({required this.trip});
 
+  String get _pickupStatus => trip.pickupCompleted ? 'Completed' : 'Scheduled';
+  String get _dropOffStatus {
+    switch (trip.status) {
+      case 'active':
+        return 'In Progress';
+      case 'completed':
+        return 'Completed';
+      case 'cancelled':
+        return 'Cancelled';
+      default:
+        return 'Scheduled';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha:0.05), blurRadius: 8, offset: const Offset(0, 2))],
-      ),
+    return DashboardCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
-            children: [
-              Icon(Icons.schedule_rounded, color: AppColors.accent, size: 18),
-              SizedBox(width: 6),
-              Text("Today's Schedule",
-                style: TextStyle(fontFamily: 'Outfit', fontSize: 15,
-                  fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-            ],
+          const SectionHeader(
+            title: "Today's Schedule",
+            subtitle: 'Pickup and drop-off progression',
           ),
           const SizedBox(height: 14),
           _ScheduleRow(label: 'Pick-up Time', time: trip.pickupTime ?? '--',
-            status: 'Completed', statusColor: AppColors.secondary),
+            status: _pickupStatus, statusColor: AppColors.secondary),
           const SizedBox(height: 10),
           _ScheduleRow(label: 'Drop-off Time', time: trip.dropOffTime ?? '--',
-            status: 'In Progress', statusColor: AppColors.primaryLight),
+            status: _dropOffStatus, statusColor: AppColors.primaryLight),
         ],
       ),
     );
@@ -421,36 +444,40 @@ class _NotificationsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha:0.05), blurRadius: 8, offset: const Offset(0, 2))],
-      ),
+    return DashboardCard(
       child: Column(
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Row(children: [
-                Icon(Icons.notifications_rounded, color: AppColors.accent, size: 18),
-                SizedBox(width: 6),
-                Text('Recent Notifications',
-                  style: TextStyle(fontFamily: 'Outfit', fontSize: 15,
-                    fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-              ]),
-              GestureDetector(
-                onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                  builder: (_) => const NotificationsScreen(),
-                )),
-                child: const Text('View All',
-                  style: TextStyle(fontFamily: 'Outfit', fontSize: 12,
-                    fontWeight: FontWeight.w600, color: AppColors.primaryLight)),
+          SectionHeader(
+            title: 'Recent Notifications',
+            subtitle: 'Latest alerts and updates',
+            trailing: GestureDetector(
+              onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => const NotificationsScreen(),
+              )),
+              child: const Text(
+                'View all',
+                style: TextStyle(
+                  fontFamily: 'Outfit',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.primaryLight,
+                ),
               ),
-            ],
+            ),
           ),
           const SizedBox(height: 12),
+          if (notifications.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Text(
+                'No notifications yet.',
+                style: TextStyle(
+                  fontFamily: 'Outfit',
+                  fontSize: 13,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ),
           ...notifications.take(3).map((n) => Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: Container(

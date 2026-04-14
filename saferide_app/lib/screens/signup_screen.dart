@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
 import 'login_screen.dart';
+import 'dashboard/dashboard_screen.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -107,8 +108,9 @@ class _SignUpScreenState extends State<SignUpScreen>
     );
     final auth = context.read<AuthProvider>();
     if (auth.status == AuthStatus.success && mounted) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const DashboardScreen()),
+        (route) => false,
       );
     }
   }
@@ -294,8 +296,8 @@ class _SignUpScreenState extends State<SignUpScreen>
                                 validator: (v) {
                                   if (v == null || v.isEmpty)
                                     return 'Password is required';
-                                  if (v.length < 6)
-                                    return 'Minimum 6 characters';
+                                  if (v.length < 8)
+                                    return 'Minimum 8 characters';
                                   return null;
                                 },
                               ),

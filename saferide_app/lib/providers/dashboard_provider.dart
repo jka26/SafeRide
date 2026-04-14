@@ -28,6 +28,7 @@ class DashboardProvider extends ChangeNotifier {
   final TripService _tripService;
   DashboardStatus _status = DashboardStatus.idle;
   String? _errorMessage;
+  bool _isTogglingTrip = false;
 
   // ── Shared ─────────────────────────────────────────────────
   UserModel? _currentUser;
@@ -62,7 +63,7 @@ class DashboardProvider extends ChangeNotifier {
   List<StudentModel> get students => _students;
   bool get tripStarted => _tripStarted;
   int get checkedIn =>
-      _students.where((s) => s.status == 'boarded').length;
+      _students.where((s) => s.status == 'boarded' || s.status == 'alighted').length;
   int get pending =>
       _students.where((s) => s.status == 'pending').length;
   int get absent =>
@@ -79,6 +80,7 @@ class DashboardProvider extends ChangeNotifier {
 
   // ── Load dashboard based on role ───────────────────────────
   Future<void> loadDashboard(String role) async {
+    _resetDashboardState();
     _status = DashboardStatus.loading;
     _errorMessage = null;
     notifyListeners();
@@ -94,6 +96,8 @@ class DashboardProvider extends ChangeNotifier {
         case 'admin':
           await _loadAdminData();
           break;
+        default:
+          throw StateError('Unsupported dashboard role: $role');
       }
       _notifications = await _notificationService.getNotifications();
       _status = DashboardStatus.loaded;
@@ -116,7 +120,7 @@ class DashboardProvider extends ChangeNotifier {
     _currentUser = data.currentUser;
     _students = data.students;
     _activeTrip = data.activeTrip;
-    _tripStarted = _activeTrip != null;
+    _tripStarted = _activeTrip?.status == 'active';
   }
 
   Future<void> _loadAdminData() async {
@@ -133,7 +137,8 @@ class DashboardProvider extends ChangeNotifier {
   // ── Driver actions ─────────────────────────────────────────
   Future<void> toggleTrip() async {
     final tripId = _activeTrip?.id;
-    if (tripId == null || tripId.isEmpty) return;
+    if (tripId == null || tripId.isEmpty || _isTogglingTrip) return;
+    _isTogglingTrip = true;
 
     try {
       if (_tripStarted) {
@@ -145,6 +150,8 @@ class DashboardProvider extends ChangeNotifier {
       _errorMessage = null;
     } catch (e) {
       _errorMessage = e.toString();
+    } finally {
+      _isTogglingTrip = false;
     }
     notifyListeners();
   }
@@ -158,10 +165,17 @@ class DashboardProvider extends ChangeNotifier {
     }
 
     try {
+      final backendStatus = switch (newStatus) {
+        'absent' => AttendanceApiStatus.absent,
+        'boarded' => AttendanceApiStatus.boarded,
+        'alighted' => AttendanceApiStatus.alighted,
+        'pending' => AttendanceApiStatus.present,
+        _ => AttendanceApiStatus.present,
+      };
       await _attendanceService.markAttendance(
         studentId: studentId,
         tripId: tripId,
-        status: newStatus == 'absent' ? 'ABSENT' : 'PRESENT',
+        status: backendStatus,
       );
       _students = _students.map((s) {
         if (s.id == studentId) {
@@ -183,5 +197,24 @@ class DashboardProvider extends ChangeNotifier {
       _errorMessage = e.toString();
     }
     notifyListeners();
+  }
+
+  Future<List<StudentModel>> getBusStudents(String busId) {
+    return _dashboardService.getBusStudents(busId);
+  }
+
+  void _resetDashboardState() {
+    _currentUser = null;
+    _child = null;
+    _activeTrip = null;
+    _notifications = [];
+    _students = [];
+    _tripStarted = false;
+    _buses = [];
+    _totalStudentsOnBoard = 0;
+    _activeAlerts = 0;
+    _completedTrips = 0;
+    _activeRoutes = 0;
+    _onTimeRate = 0;
   }
 }

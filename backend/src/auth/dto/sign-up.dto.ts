@@ -1,4 +1,4 @@
-import { IsEmail, IsEnum, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsIn, IsString, MinLength } from 'class-validator';
 import { AppRole } from '../../common/auth/roles.enum';
 
 export class SignUpDto {
@@ -13,6 +13,6 @@ export class SignUpDto {
   @MinLength(2)
   fullName!: string;
 
-  @IsEnum(AppRole)
-  role!: AppRole;
+  @IsIn([AppRole.PARENT, AppRole.DRIVER])
+  role!: AppRole.PARENT | AppRole.DRIVER;
 }
