@@ -205,6 +205,24 @@ describe('SafeRide API (e2e)', () => {
     });
   });
 
+  describe('Drivers (admin)', () => {
+    it('GET /api/drivers — admin lists drivers with nested user', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/drivers')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+      expect(Array.isArray(res.body)).toBe(true);
+      expect(res.body.length).toBeGreaterThanOrEqual(1);
+      expect(res.body[0]).toMatchObject({
+        id: expect.any(String),
+        user: expect.objectContaining({
+          fullName: expect.any(String),
+          email: expect.any(String),
+        }),
+      });
+    });
+  });
+
   describe('Trips', () => {
     it('POST /api/trips — admin creates trip', async () => {
       const res = await request(app.getHttpServer())
