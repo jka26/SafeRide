@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { CreateTripDto } from './dto/create-trip.dto';
 import { UpdateTripDto } from './dto/update-trip.dto';
@@ -7,7 +11,25 @@ import { UpdateTripDto } from './dto/update-trip.dto';
 export class TripsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  create(dto: CreateTripDto) {
+  async create(dto: CreateTripDto) {
+    const bus = await this.prisma.bus.findUnique({
+      where: { id: dto.busId },
+      select: { id: true },
+    });
+    if (!bus) {
+      throw new BadRequestException('Bus not found');
+    }
+    if (dto.driverId) {
+      const driver = await this.prisma.driver.findUnique({
+        where: { id: dto.driverId },
+        select: { id: true },
+      });
+      if (!driver) {
+        throw new BadRequestException(
+          'Driver profile not found — use Driver id, not User id',
+        );
+      }
+    }
     return this.prisma.trip.create({
       data: {
         ...dto,
@@ -34,7 +56,7 @@ export class TripsService {
     return trip;
   }
 
-  update(id: string, dto: UpdateTripDto) {
+  async update(id: string, dto: UpdateTripDto) {
     const {
       tripDate,
       startedAt,
@@ -46,6 +68,26 @@ export class TripsService {
       busId,
       driverId,
     } = dto;
+    if (busId !== undefined) {
+      const bus = await this.prisma.bus.findUnique({
+        where: { id: busId },
+        select: { id: true },
+      });
+      if (!bus) {
+        throw new BadRequestException('Bus not found');
+      }
+    }
+    if (driverId !== undefined && driverId !== null) {
+      const driver = await this.prisma.driver.findUnique({
+        where: { id: driverId },
+        select: { id: true },
+      });
+      if (!driver) {
+        throw new BadRequestException(
+          'Driver profile not found — use Driver id, not User id',
+        );
+      }
+    }
     return this.prisma.trip.update({
       where: { id },
       data: {

@@ -1,14 +1,7 @@
 import { IsNotEmpty, IsString } from 'class-validator';
 
+/** Bus/route come from admin-assigned trips; drivers only confirm safety contact. */
 export class CompleteDriverOnboardingDto {
-  @IsString()
-  @IsNotEmpty()
-  busNumber!: string;
-
-  @IsString()
-  @IsNotEmpty()
-  routeName!: string;
-
   @IsString()
   @IsNotEmpty()
   emergencyContactName!: string;

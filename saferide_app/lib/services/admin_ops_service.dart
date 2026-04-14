@@ -34,13 +34,16 @@ class AdminOpsService {
     return response
         .cast<Map<String, dynamic>>()
         .where((u) => (u['role'] ?? '').toString().toUpperCase() == 'DRIVER')
-        .map(
-          (u) => AdminDriverOption(
-            id: (u['id'] ?? '').toString(),
+        .map((u) {
+          final driver = u['driver'] as Map<String, dynamic>?;
+          // Trip.driverId references Driver.id, not User.id.
+          final profileId = (driver?['id'] ?? '').toString();
+          return AdminDriverOption(
+            id: profileId,
             fullName: (u['fullName'] ?? 'Unnamed driver').toString(),
             email: (u['email'] ?? '').toString(),
-          ),
-        )
+          );
+        })
         .where((d) => d.id.isNotEmpty)
         .toList();
   }

@@ -74,7 +74,7 @@ class TripModel {
         as Map<String, dynamic>;
     final locationSeen = latestLocation.isNotEmpty;
     return TripModel(
-      id: (json['tripId'] ?? '').toString(),
+      id: (json['tripId'] ?? json['id'] ?? '').toString(),
       routeName: (json['name'] ?? bus['routeName'] ?? '--').toString(),
       busNumber: (bus['plateNumber'] ?? '--').toString(),
       status: _uiStatusFromTripStatus((json['status'] ?? '').toString()),

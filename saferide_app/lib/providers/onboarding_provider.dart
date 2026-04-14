@@ -46,10 +46,6 @@ class OnboardingProvider extends ChangeNotifier {
   }
 
   Future<void> submitDriverDetails({
-    required String fullName,
-    required String phone,
-    required String busNumber,
-    required String routeName,
     required String emergencyContactName,
     required String emergencyContactPhone,
   }) async {
@@ -58,8 +54,6 @@ class OnboardingProvider extends ChangeNotifier {
       await _apiClient.post(
         '/onboarding/driver',
         body: {
-          'busNumber': busNumber,
-          'routeName': routeName,
           'emergencyContactName': emergencyContactName,
           'emergencyContactPhone': emergencyContactPhone,
         },

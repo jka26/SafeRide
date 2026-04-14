@@ -37,9 +37,7 @@ class _OnboardingStep2ScreenState extends State<OnboardingStep2Screen>
   final _emergencyNameCtrl = TextEditingController();
   final _emergencyPhoneCtrl = TextEditingController();
 
-  // Driver fields
-  final _busNumberCtrl = TextEditingController();
-  final _routeNameCtrl = TextEditingController();
+  // Driver fields (bus/route assigned by admin)
   final _driverEmergencyNameCtrl = TextEditingController();
   final _driverEmergencyPhoneCtrl = TextEditingController();
 
@@ -135,8 +133,6 @@ class _OnboardingStep2ScreenState extends State<OnboardingStep2Screen>
     _stopNameCtrl.dispose();
     _emergencyNameCtrl.dispose();
     _emergencyPhoneCtrl.dispose();
-    _busNumberCtrl.dispose();
-    _routeNameCtrl.dispose();
     _driverEmergencyNameCtrl.dispose();
     _driverEmergencyPhoneCtrl.dispose();
     super.dispose();
@@ -152,10 +148,6 @@ class _OnboardingStep2ScreenState extends State<OnboardingStep2Screen>
 
     if (isDriver) {
       await onboarding.submitDriverDetails(
-        fullName: widget.fullName,
-        phone: widget.phone,
-        busNumber: _busNumberCtrl.text.trim(),
-        routeName: _routeNameCtrl.text.trim(),
         emergencyContactName: _driverEmergencyNameCtrl.text.trim(),
         emergencyContactPhone: _driverEmergencyPhoneCtrl.text.trim(),
       );
@@ -248,7 +240,7 @@ class _OnboardingStep2ScreenState extends State<OnboardingStep2Screen>
                         const SizedBox(height: 6),
                         Text(
                           isDriver
-                              ? 'Your route\ninformation'
+                              ? 'Emergency\ncontact'
                               : 'About your\nchild',
                           style: const TextStyle(fontFamily: 'Outfit',
                             fontSize: 28, fontWeight: FontWeight.bold,
@@ -257,7 +249,7 @@ class _OnboardingStep2ScreenState extends State<OnboardingStep2Screen>
                         const SizedBox(height: 8),
                         Text(
                           isDriver
-                              ? 'This helps us assign you to the correct route and bus.'
+                              ? 'Your school assigns your bus and route. Add who we should call in an emergency.'
                               : 'This helps us track your child and send you the right alerts.',
                           style: TextStyle(fontFamily: 'Outfit', fontSize: 13,
                             color: Colors.white.withOpacity(0.5))),
@@ -285,8 +277,6 @@ class _OnboardingStep2ScreenState extends State<OnboardingStep2Screen>
                               // Render fields based on role
                               if (isDriver)
                                 _DriverFields(
-                                  busNumberCtrl: _busNumberCtrl,
-                                  routeNameCtrl: _routeNameCtrl,
                                   emergencyNameCtrl: _driverEmergencyNameCtrl,
                                   emergencyPhoneCtrl: _driverEmergencyPhoneCtrl,
                                   onPickEmergencyContact: () => _pickEmergencyContact(
@@ -484,15 +474,11 @@ class _ParentFields extends StatelessWidget {
 // ── Driver fields ─────────────────────────────────────────────────────────────
 
 class _DriverFields extends StatelessWidget {
-  final TextEditingController busNumberCtrl;
-  final TextEditingController routeNameCtrl;
   final TextEditingController emergencyNameCtrl;
   final TextEditingController emergencyPhoneCtrl;
   final VoidCallback onPickEmergencyContact;
 
   const _DriverFields({
-    required this.busNumberCtrl,
-    required this.routeNameCtrl,
     required this.emergencyNameCtrl,
     required this.emergencyPhoneCtrl,
     required this.onPickEmergencyContact,
@@ -503,30 +489,6 @@ class _DriverFields extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _FieldLabel(label: 'Bus number'),
-        const SizedBox(height: 6),
-        _InputField(
-          controller: busNumberCtrl,
-          hint: 'e.g. B-42',
-          icon: Icons.directions_bus_rounded,
-          validator: (v) => v == null || v.trim().isEmpty
-              ? 'Bus number is required' : null,
-        ),
-
-        const SizedBox(height: 16),
-
-        const _FieldLabel(label: 'Route name'),
-        const SizedBox(height: 6),
-        _InputField(
-          controller: routeNameCtrl,
-          hint: 'e.g. Route North',
-          icon: Icons.route_rounded,
-          validator: (v) => v == null || v.trim().isEmpty
-              ? 'Route name is required' : null,
-        ),
-
-        const SizedBox(height: 24),
-
         // Emergency contact section
         Container(
           padding: const EdgeInsets.all(14),
