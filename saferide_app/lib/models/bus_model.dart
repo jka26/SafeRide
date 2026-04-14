@@ -1,5 +1,6 @@
 class BusModel {
   final String id;
+  final String tripId;
   final String busNumber;
   final String routeName;
   final String driverName;
@@ -7,9 +8,14 @@ class BusModel {
   final int studentsOnBoard;
   final double routeProgress; // 0.0 to 1.0
   final String status; // 'active', 'idle', 'delayed', 'completed'
+  final double? latitude;
+  final double? longitude;
+  final String? currentStopName;
+  final int? etaMinutes;
 
   const BusModel({
     required this.id,
+    required this.tripId,
     required this.busNumber,
     required this.routeName,
     required this.driverName,
@@ -17,9 +23,19 @@ class BusModel {
     required this.studentsOnBoard,
     required this.routeProgress,
     required this.status,
+    this.latitude,
+    this.longitude,
+    this.currentStopName,
+    this.etaMinutes,
   });
 
-  factory BusModel.fromAdminTrip(Map<String, dynamic> json) {
+  factory BusModel.fromAdminTrip(
+    Map<String, dynamic> json, {
+    double? latitude,
+    double? longitude,
+    String? currentStopName,
+    int? etaMinutes,
+  }) {
     final bus = (json['bus'] ?? const <String, dynamic>{}) as Map<String, dynamic>;
     final driver = (json['driver'] ?? const <String, dynamic>{}) as Map<String, dynamic>;
     final driverUser = (driver['user'] ?? const <String, dynamic>{}) as Map<String, dynamic>;
@@ -28,6 +44,7 @@ class BusModel {
 
     return BusModel(
       id: (json['id'] ?? '').toString(),
+      tripId: (json['id'] ?? '').toString(),
       busNumber: (bus['plateNumber'] ?? '--').toString(),
       routeName: (bus['routeName'] ?? '--').toString(),
       driverName: (driverUser['fullName'] ?? 'Unassigned').toString(),
@@ -35,6 +52,10 @@ class BusModel {
       studentsOnBoard: attendanceCount,
       routeProgress: 0,
       status: _statusFromTrip((json['status'] ?? '').toString()),
+      latitude: latitude,
+      longitude: longitude,
+      currentStopName: currentStopName,
+      etaMinutes: etaMinutes,
     );
   }
 

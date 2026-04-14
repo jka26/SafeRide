@@ -265,6 +265,13 @@ class DashboardProvider extends ChangeNotifier {
     _onTimeRate = 0;
   }
 
+  void clearDashboardState() {
+    _resetDashboardState();
+    _status = DashboardStatus.idle;
+    _errorMessage = null;
+    notifyListeners();
+  }
+
   Future<void> _ensureDriverLocationSharing() async {
     final tripId = _activeTrip?.id;
     if (!_tripStarted || tripId == null || tripId.isEmpty) {

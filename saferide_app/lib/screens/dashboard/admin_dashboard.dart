@@ -376,6 +376,7 @@ class _BusCard extends StatelessWidget {
                 builder: (_) => RouteMapScreen(
                   title: 'Tracking ${bus.busNumber}',
                   color: _statusColor,
+                  tripId: bus.tripId,
                   bus: bus,
                 ),
               )),

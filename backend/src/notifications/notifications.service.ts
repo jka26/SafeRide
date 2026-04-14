@@ -3,6 +3,7 @@ import { PrismaService } from '../database/prisma.service';
 import { CreateNotificationDto } from './dto/create-notification.dto';
 import { AppRole } from '../common/auth/roles.enum';
 import type { AuthenticatedUser } from '../common/auth/authenticated-user.interface';
+import { ReportEmergencyDto } from './dto/report-emergency.dto';
 
 @Injectable()
 export class NotificationsService {
@@ -175,5 +176,26 @@ export class NotificationsService {
             throw new NotFoundException(`Notification ${id} not found`);
         }
         return this.prisma.notification.delete({ where: { id } });
+    }
+
+    async reportEmergency(dto: ReportEmergencyDto, actor: AuthenticatedUser) {
+        if (actor.role !== AppRole.DRIVER && actor.role !== AppRole.ADMIN) {
+            throw new ForbiddenException('Only drivers or admins can report emergencies');
+        }
+
+        const typeLabel = dto.type[0].toUpperCase() + dto.type.slice(1);
+        const locationLabel =
+            dto.latitude !== undefined && dto.longitude !== undefined
+                ? ` @ (${dto.latitude.toFixed(5)}, ${dto.longitude.toFixed(5)})`
+                : '';
+        const tripLabel = dto.tripId ? ` [trip:${dto.tripId}]` : '';
+
+        return this.prisma.notification.create({
+            data: {
+                title: `Emergency Alert: ${typeLabel}`,
+                body: `Reported by ${actor.email}${tripLabel}${locationLabel}`,
+                targetRole: 'ADMIN',
+            },
+        });
     }
 }

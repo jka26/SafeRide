@@ -4,7 +4,7 @@ import '../../providers/dashboard_provider.dart';
 import '../../models/notification_model.dart';
 import '../../notifications/notification_screen.dart';
 import '../../maps/live_map_screen.dart';
-import '../../shared/placeholder_screen.dart';
+import '../parent/child_details_screen.dart';
 import '../../theme/app_theme.dart';
 import '../../ui/app_motion.dart';
 import '../../ui/dashboard_kit.dart';
@@ -223,11 +223,9 @@ class _ChildCard extends StatelessWidget {
             ),
           TapScale(
             onTap: () => Navigator.of(context).push(MaterialPageRoute(
-              builder: (_) => const PlaceholderScreen(
-                title: 'Child Details',
-                subtitle: 'View and manage your child\'s transport details and history.',
-                icon: Icons.child_care_rounded,
-                color: AppColors.primaryLight,
+              builder: (_) => ChildDetailsScreen(
+                child: child,
+                trip: trip,
               ),
             )),
             child: Row(

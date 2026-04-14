@@ -13,6 +13,7 @@ import { Roles } from '../common/auth/roles.decorator';
 import { AppRole } from '../common/auth/roles.enum';
 import { CurrentUser } from '../common/auth/current-user.decorator';
 import type { AuthenticatedUser } from '../common/auth/authenticated-user.interface';
+import { ReportEmergencyDto } from './dto/report-emergency.dto';
 
 @Controller('notifications')
 export class NotificationsController {
@@ -67,5 +68,14 @@ export class NotificationsController {
     @Roles(AppRole.ADMIN)
     remove(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
         return this.notificationsService.remove(id, user);
+    }
+
+    @Post('emergency')
+    @Roles(AppRole.DRIVER, AppRole.ADMIN)
+    reportEmergency(
+        @Body() dto: ReportEmergencyDto,
+        @CurrentUser() user: AuthenticatedUser,
+    ) {
+        return this.notificationsService.reportEmergency(dto, user);
     }
 }

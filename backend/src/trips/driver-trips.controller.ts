@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
 import { TripActionsService } from './trip-actions.service';
 import { Roles } from '../common/auth/roles.decorator';
 import { AppRole } from '../common/auth/roles.enum';
@@ -49,5 +49,13 @@ export class DriverTripsController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.tripActions.updateProgress(tripId, user, dto);
+  }
+
+  @Get(':tripId/live')
+  live(
+    @Param('tripId') tripId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.tripActions.getLiveForOperations(tripId, user);
   }
 }
