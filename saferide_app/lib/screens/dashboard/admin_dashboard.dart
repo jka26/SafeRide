@@ -7,6 +7,7 @@ import '../../admin/bus_students_screen.dart';
 import '../../admin/csv_upload_screen.dart';
 import '../../maps/fleet_map_screen.dart';
 import '../../maps/route_map_screen.dart';
+import '../../ui/app_motion.dart';
 import '../../widgets/logout_button.dart';
 
 class AdminDashboard extends StatefulWidget {
@@ -56,9 +57,23 @@ class _AdminDashboardState extends State<AdminDashboard>
             child: TabBarView(
               controller: _tabController,
               children: [
-                _FleetOverview(buses: dashboard.buses),
-                const _RecentEvents(),
-                const _Reports(),
+                FadeSlideIn(child: _FleetOverview(buses: dashboard.buses)),
+                FadeSlideIn(
+                  delay: const Duration(milliseconds: 80),
+                  child: _RecentEvents(
+                    buses: dashboard.buses,
+                    activeAlerts: dashboard.activeAlerts,
+                    completedTrips: dashboard.completedTrips,
+                  ),
+                ),
+                FadeSlideIn(
+                  delay: const Duration(milliseconds: 140),
+                  child: _Reports(
+                    activeRoutes: dashboard.activeRoutes,
+                    onTimeRate: dashboard.onTimeRate,
+                    totalStudentsOnBoard: dashboard.totalStudentsOnBoard,
+                  ),
+                ),
               ],
             ),
           ),
@@ -218,7 +233,7 @@ class _FleetOverview extends StatelessWidget {
               const Text('Active Fleet Status',
                 style: TextStyle(fontFamily: 'Outfit', fontSize: 15,
                   fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-              GestureDetector(
+              TapScale(
                 onTap: () => Navigator.of(context).push(MaterialPageRoute(
                   builder: (_) => FleetMapScreen(buses: buses),
                 )),
@@ -356,7 +371,7 @@ class _BusCard extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Row(children: [
-            Expanded(child: GestureDetector(
+            Expanded(child: TapScale(
               onTap: () => Navigator.of(context).push(MaterialPageRoute(
                 builder: (_) => RouteMapScreen(
                   title: 'Tracking ${bus.busNumber}',
@@ -371,13 +386,25 @@ class _BusCard extends StatelessWidget {
               ),
             )),
             const SizedBox(width: 8),
-            Expanded(child: GestureDetector(
-              onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                builder: (_) => BusStudentsScreen(
-                  bus: bus,
-                  students: dashboard.students,
-                ),
-              )),
+            Expanded(child: TapScale(
+              onTap: () async {
+                try {
+                  final students =
+                      await context.read<DashboardProvider>().getBusStudents(bus.id);
+                  if (!context.mounted) return;
+                  Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => BusStudentsScreen(
+                      bus: bus,
+                      students: students,
+                    ),
+                  ));
+                } catch (e) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(e.toString())),
+                  );
+                }
+              },
               child: _BusActionButton(
                 icon: Icons.people_rounded,
                 label: 'Students',
@@ -420,25 +447,140 @@ class _BusActionButton extends StatelessWidget {
 }
 
 class _RecentEvents extends StatelessWidget {
-  const _RecentEvents();
+  const _RecentEvents({
+    required this.buses,
+    required this.activeAlerts,
+    required this.completedTrips,
+  });
+
+  final List<BusModel> buses;
+  final int activeAlerts;
+  final int completedTrips;
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
-      child: Text('Recent Events — Coming Soon',
-        style: TextStyle(fontFamily: 'Outfit', fontSize: 14, color: AppColors.textSecondary)),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          _EventTile(
+            title: 'Trips Completed Today',
+            value: '$completedTrips',
+            icon: Icons.check_circle_rounded,
+            color: AppColors.secondary,
+          ),
+          const SizedBox(height: 12),
+          _EventTile(
+            title: 'Active Alerts',
+            value: '$activeAlerts',
+            icon: Icons.warning_rounded,
+            color: AppColors.accent,
+          ),
+          const SizedBox(height: 12),
+          _EventTile(
+            title: 'Buses Reporting',
+            value: '${buses.length}',
+            icon: Icons.directions_bus_rounded,
+            color: AppColors.primaryLight,
+          ),
+        ],
+      ),
     );
   }
 }
 
 class _Reports extends StatelessWidget {
-  const _Reports();
+  const _Reports({
+    required this.activeRoutes,
+    required this.onTimeRate,
+    required this.totalStudentsOnBoard,
+  });
+
+  final int activeRoutes;
+  final double onTimeRate;
+  final int totalStudentsOnBoard;
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
-      child: Text('Reports — Coming Soon',
-        style: TextStyle(fontFamily: 'Outfit', fontSize: 14, color: AppColors.textSecondary)),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          _EventTile(
+            title: 'Active Routes',
+            value: '$activeRoutes',
+            icon: Icons.alt_route_rounded,
+            color: AppColors.primaryLight,
+          ),
+          const SizedBox(height: 12),
+          _EventTile(
+            title: 'On-Time Performance',
+            value: '${onTimeRate.toStringAsFixed(1)}%',
+            icon: Icons.trending_up_rounded,
+            color: AppColors.secondary,
+          ),
+          const SizedBox(height: 12),
+          _EventTile(
+            title: 'Students On Board',
+            value: '$totalStudentsOnBoard',
+            icon: Icons.groups_rounded,
+            color: AppColors.accentDark,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EventTile extends StatelessWidget {
+  const _EventTile({
+    required this.title,
+    required this.value,
+    required this.icon,
+    required this.color,
+  });
+
+  final String title;
+  final String value;
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              title,
+              style: const TextStyle(
+                fontFamily: 'Outfit',
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              fontFamily: 'Outfit',
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: color,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

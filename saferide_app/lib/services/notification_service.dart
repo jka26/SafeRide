@@ -17,4 +17,10 @@ class NotificationService {
   Future<void> markRead(String id) async {
     await _apiClient.patch('/notifications/$id/read');
   }
+
+  Future<int> getUnreadCount() async {
+    final response =
+        await _apiClient.get('/notifications/unread-count') as Map<String, dynamic>;
+    return (response['unreadCount'] as num?)?.toInt() ?? 0;
+  }
 }

@@ -1,20 +1,159 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:socket_io_client/socket_io_client.dart' as io;
+import '../api/api_client.dart';
+import '../api/api_config.dart';
+import '../api/session_store.dart';
 import '../theme/app_theme.dart';
 
-/// Live Map screen shown to parents.
-/// Displays a single bus marker heading toward school.
-/// Uses demo coordinates (Accra, Ghana) until real GPS is connected.
-class LiveMapScreen extends StatelessWidget {
-  const LiveMapScreen({super.key});
+class LiveMapScreen extends StatefulWidget {
+  const LiveMapScreen({super.key, required this.tripId});
 
-  static const _busLocation = LatLng(5.6150, -0.1950);
+  final String tripId;
+
+  @override
+  State<LiveMapScreen> createState() => _LiveMapScreenState();
+}
+
+class _LiveMapScreenState extends State<LiveMapScreen> {
+  static const _pollInterval = Duration(seconds: 15);
   static const _schoolLocation = LatLng(5.5900, -0.1800);
   static const _mapCenter = LatLng(5.6030, -0.1875);
 
+  final ApiClient _apiClient = ApiClient();
+  Timer? _pollTimer;
+  io.Socket? _socket;
+
+  bool _isLoading = true;
+  String? _error;
+  LatLng? _busLocation;
+  String _tripName = 'Live Map';
+  String _tripStatus = 'idle';
+  String? _currentStop;
+  int? _etaMinutes;
+
+  @override
+  void initState() {
+    super.initState();
+    _connectToLiveUpdates();
+    _refresh();
+    _pollTimer = Timer.periodic(_pollInterval, (_) => _refresh());
+  }
+
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    _socket?.disconnect();
+    _socket?.dispose();
+    super.dispose();
+  }
+
+  void _connectToLiveUpdates() {
+    final token = SessionStore.instance.token;
+    if (token == null || token.isEmpty) {
+      return;
+    }
+    final baseUri = Uri.parse(ApiConfig.baseUrl);
+    final socketBaseUri = Uri(
+      scheme: baseUri.scheme,
+      host: baseUri.host,
+      port: baseUri.hasPort ? baseUri.port : null,
+    );
+    final socket = io.io(
+      '${socketBaseUri.toString()}/tracking',
+      io.OptionBuilder()
+          .setTransports(['websocket'])
+          .disableAutoConnect()
+          .enableForceNew()
+          .setAuth({'token': token})
+          .build(),
+    );
+
+    socket.onConnect((_) {
+      socket.emit('subscribe', {'tripId': widget.tripId});
+    });
+
+    socket.on('location', (payload) {
+      if (!mounted || payload is! Map<String, dynamic>) {
+        return;
+      }
+      final eventTripId = (payload['tripId'] ?? '').toString();
+      if (eventTripId != widget.tripId) {
+        return;
+      }
+      final latitude = (payload['latitude'] as num?)?.toDouble();
+      final longitude = (payload['longitude'] as num?)?.toDouble();
+      if (latitude == null || longitude == null) {
+        return;
+      }
+      setState(() {
+        _busLocation = LatLng(latitude, longitude);
+        _error = null;
+        _isLoading = false;
+      });
+    });
+
+    socket.connect();
+    _socket = socket;
+  }
+
+  Future<void> _refresh() async {
+    try {
+      final response = await _apiClient.get('/parent/tracking/trips/${widget.tripId}')
+          as Map<String, dynamic>;
+      final trip = (response['trip'] ?? const <String, dynamic>{}) as Map<String, dynamic>;
+      final latestLocation =
+          (response['latestLocation'] ?? const <String, dynamic>{}) as Map<String, dynamic>;
+      final hasLocation = latestLocation.isNotEmpty;
+
+      setState(() {
+        _tripName = (trip['name'] ?? 'Live Map').toString();
+        _tripStatus = (trip['status'] ?? 'idle').toString().toUpperCase();
+        _currentStop = (trip['currentStopName'] as String?)?.trim();
+        _etaMinutes = (trip['etaMinutes'] as num?)?.toInt();
+        _busLocation = hasLocation
+            ? LatLng(
+                (latestLocation['latitude'] as num?)?.toDouble() ?? _mapCenter.latitude,
+                (latestLocation['longitude'] as num?)?.toDouble() ?? _mapCenter.longitude,
+              )
+            : null;
+        _error = null;
+        _isLoading = false;
+      });
+    } on ApiException catch (e) {
+      setState(() {
+        _error = e.message;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
+    }
+  }
+
+  String get _statusLabel {
+    switch (_tripStatus) {
+      case 'IN_PROGRESS':
+        return 'In Progress';
+      case 'COMPLETED':
+        return 'Completed';
+      case 'SCHEDULED':
+        return 'Scheduled';
+      case 'CANCELLED':
+        return 'Cancelled';
+      default:
+        return _tripStatus;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final mapCenter = _busLocation ?? _mapCenter;
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -24,7 +163,7 @@ class LiveMapScreen extends StatelessWidget {
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: const Text(
-          'Live Map',
+          'Live Tracking',
           style: TextStyle(
             fontFamily: 'Outfit',
             fontSize: 16,
@@ -33,151 +172,160 @@ class LiveMapScreen extends StatelessWidget {
           ),
         ),
       ),
-      body: Stack(
-        children: [
-          FlutterMap(
-            options: const MapOptions(
-              initialCenter: _mapCenter,
-              initialZoom: 13.5,
-            ),
-            children: [
-              TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName: 'com.saferide.app',
-              ),
-              PolylineLayer(
-                polylines: [
-                  Polyline(
-                    points: const [_busLocation, _schoolLocation],
-                    color: AppColors.primary,
-                    strokeWidth: 3,
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+          : Stack(
+              children: [
+                FlutterMap(
+                  options: MapOptions(
+                    initialCenter: mapCenter,
+                    initialZoom: 13.5,
                   ),
-                ],
-              ),
-              MarkerLayer(
-                markers: [
-                  // School marker
-                  Marker(
-                    point: _schoolLocation,
-                    width: 44,
-                    height: 44,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: AppColors.accent,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 2),
-                        boxShadow: const [
-                          BoxShadow(color: Colors.black26, blurRadius: 4),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.school_rounded,
-                        color: Colors.white,
-                        size: 22,
-                      ),
+                  children: [
+                    TileLayer(
+                      urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      userAgentPackageName: 'com.saferide.app',
                     ),
-                  ),
-                  // Bus marker
-                  Marker(
-                    point: _busLocation,
-                    width: 50,
-                    height: 50,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: AppColors.secondary,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 2.5),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.secondary.withValues(alpha:0.4),
-                            blurRadius: 10,
-                            spreadRadius: 2,
+                    if (_busLocation != null)
+                      PolylineLayer(
+                        polylines: [
+                          Polyline(
+                            points: [_busLocation!, _schoolLocation],
+                            color: AppColors.primary,
+                            strokeWidth: 3,
                           ),
                         ],
                       ),
-                      child: const Icon(
-                        Icons.directions_bus_rounded,
-                        color: Colors.white,
-                        size: 24,
-                      ),
+                    MarkerLayer(
+                      markers: [
+                        Marker(
+                          point: _schoolLocation,
+                          width: 44,
+                          height: 44,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: AppColors.accent,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 2),
+                              boxShadow: const [
+                                BoxShadow(color: Colors.black26, blurRadius: 4),
+                              ],
+                            ),
+                            child: const Icon(
+                              Icons.school_rounded,
+                              color: Colors.white,
+                              size: 22,
+                            ),
+                          ),
+                        ),
+                        if (_busLocation != null)
+                          Marker(
+                            point: _busLocation!,
+                            width: 50,
+                            height: 50,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: AppColors.secondary,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.white, width: 2.5),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppColors.secondary.withValues(alpha: 0.4),
+                                    blurRadius: 10,
+                                    spreadRadius: 2,
+                                  ),
+                                ],
+                              ),
+                              child: const Icon(
+                                Icons.directions_bus_rounded,
+                                color: Colors.white,
+                                size: 24,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+
+                Positioned(
+                  top: 12,
+                  left: 12,
+                  right: 12,
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: (_error == null
+                              ? AppColors.primary
+                              : AppColors.error)
+                          .withValues(alpha: 0.95),
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: const [
+                        BoxShadow(color: Colors.black12, blurRadius: 6),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.info_outline_rounded,
+                            color: Colors.white, size: 16),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _error ??
+                                '$_tripName • $_statusLabel'
+                                    '${_etaMinutes == null ? '' : ' • ETA ${_etaMinutes} min'}'
+                                    '${_currentStop == null || _currentStop!.isEmpty ? '' : ' • $_currentStop'}',
+                            style: const TextStyle(
+                              fontFamily: 'Outfit',
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
-            ],
-          ),
+                ),
 
-          // Demo data banner
-          Positioned(
-            top: 12,
-            left: 12,
-            right: 12,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: AppColors.accent.withValues(alpha:0.95),
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: const [
-                  BoxShadow(color: Colors.black12, blurRadius: 6),
-                ],
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.info_outline_rounded, color: Colors.white, size: 16),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Demo data — GPS tracking not yet connected',
-                      style: TextStyle(
-                        fontFamily: 'Outfit',
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
+                Positioned(
+                  bottom: 16,
+                  left: 16,
+                  right: 16,
+                  child: Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Colors.black12,
+                          blurRadius: 8,
+                          offset: Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        if (_busLocation != null)
+                          const _LegendItem(
+                            color: AppColors.secondary,
+                            icon: Icons.directions_bus_rounded,
+                            label: 'Bus Location',
+                          ),
+                        if (_busLocation != null) const SizedBox(width: 20),
+                        const _LegendItem(
+                          color: AppColors.accent,
+                          icon: Icons.school_rounded,
+                          label: 'School',
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ),
-
-          // Legend card
-          Positioned(
-            bottom: 16,
-            left: 16,
-            right: 16,
-            child: Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Colors.black12,
-                    blurRadius: 8,
-                    offset: Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: const Row(
-                children: [
-                  _LegendItem(
-                    color: AppColors.secondary,
-                    icon: Icons.directions_bus_rounded,
-                    label: 'Bus Location',
-                  ),
-                  SizedBox(width: 20),
-                  _LegendItem(
-                    color: AppColors.accent,
-                    icon: Icons.school_rounded,
-                    label: 'School',
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
