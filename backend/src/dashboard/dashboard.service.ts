@@ -87,10 +87,31 @@ export class DashboardService {
                 trip: { tripDate: { gte: today, lt: tomorrow } },
             },
         });
+        const boardedToday = await this.prisma.attendance.count({
+            where: {
+                status: 'BOARDED',
+                trip: { tripDate: { gte: today, lt: tomorrow } },
+            },
+        });
+        const alightedToday = await this.prisma.attendance.count({
+            where: {
+                status: 'ALIGHTED',
+                trip: { tripDate: { gte: today, lt: tomorrow } },
+            },
+        });
 
         const tripsByStatus = Object.fromEntries(
             tripStatusBreakdown.map((row) => [row.status, row._count._all]),
         ) as Record<string, number>;
+
+        const activeRouteSet = new Set(
+            inProgressTrips.map((trip) => trip.bus.routeName).filter(Boolean),
+        );
+        const completedTripsToday = todaysTrips.filter(
+            (trip) => trip.status === TripStatus.COMPLETED,
+        ).length;
+        const studentsOnBoard = presentToday + boardedToday + alightedToday;
+        const attendanceTotal = presentToday + absentToday + boardedToday + alightedToday;
 
         return {
             counts: {
@@ -107,6 +128,15 @@ export class DashboardService {
             recentNotifications,
             tripsByStatus,
             inProgressTrips,
+            metrics: {
+                studentsOnBoard,
+                completedTrips: completedTripsToday,
+                activeRoutes: activeRouteSet.size,
+                onTimeRate:
+                    attendanceTotal === 0
+                        ? 0
+                        : ((presentToday + boardedToday + alightedToday) / attendanceTotal) * 100,
+            },
         };
     }
 
