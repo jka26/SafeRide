@@ -54,6 +54,7 @@ export class SessionAuthGuard implements CanActivate {
       email: session.user.email,
       role: session.user.role as AppRole,
       fullName: session.user.fullName,
+      onboardingCompleted: session.user.onboardingCompleted,
     };
     return true;
   }

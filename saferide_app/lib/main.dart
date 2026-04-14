@@ -9,6 +9,7 @@ import 'providers/onboarding_provider.dart';
 import 'theme/app_theme.dart';
 import 'screens/welcome_screen.dart';
 import 'screens/dashboard/dashboard_screen.dart';
+import 'screens/onboarding_step1_screen.dart';
 
 void main() async {
   WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
@@ -40,6 +41,7 @@ class SafeRideApp extends StatefulWidget {
 class _SafeRideAppState extends State<SafeRideApp> {
   bool _ready = false;
   bool _hasSession = false;
+  bool _needsOnboarding = false;
 
   @override
   void initState() {
@@ -53,13 +55,22 @@ class _SafeRideAppState extends State<SafeRideApp> {
     if (token != null && token.isNotEmpty) {
       // Verify the saved token is still valid by calling GET /auth/me
       final restored = await context.read<AuthProvider>().restoreSession();
+      bool needsOnboarding = false;
+      if (restored) {
+        final user = context.read<AuthProvider>().currentUser;
+        if (user != null && user.userRole != UserRole.admin) {
+          needsOnboarding = !user.onboardingCompleted;
+        }
+      }
       setState(() {
         _hasSession = restored;
+        _needsOnboarding = needsOnboarding;
         _ready = true;
       });
     } else {
       setState(() {
         _hasSession = false;
+        _needsOnboarding = false;
         _ready = true;
       });
     }
@@ -84,7 +95,9 @@ class _SafeRideAppState extends State<SafeRideApp> {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,      // ← colours, fonts, button styles
       home: _hasSession
-          ? const DashboardScreen()   // ← returning user
+          ? (_needsOnboarding
+              ? const OnboardingStep1Screen()
+              : const DashboardScreen())
           : const WelcomeScreen(),    // ← new / logged out user
     );
   }

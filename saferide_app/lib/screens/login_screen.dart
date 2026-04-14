@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
 import 'signup_screen.dart';
+import 'onboarding_step1_screen.dart';
 import 'dashboard/dashboard_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -66,8 +67,16 @@ class _LoginScreenState extends State<LoginScreen>
 
     final auth = context.read<AuthProvider>();
     if (auth.status == AuthStatus.success && mounted) {
+      final user = auth.currentUser;
+      final needsOnboarding = user != null &&
+          user.userRole != UserRole.admin &&
+          !user.onboardingCompleted;
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const DashboardScreen()),
+        MaterialPageRoute(
+          builder: (_) => needsOnboarding
+              ? const OnboardingStep1Screen()
+              : const DashboardScreen(),
+        ),
         (route) => false,
       );
     }
