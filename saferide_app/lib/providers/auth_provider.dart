@@ -11,12 +11,14 @@ class AuthenticatedUser {
   final String email;
   final String role;
   final String fullName;
+  final bool onboardingCompleted;
 
   const AuthenticatedUser({
     required this.id,
     required this.email,
     required this.role,
     required this.fullName,
+    required this.onboardingCompleted,
   });
 
   factory AuthenticatedUser.fromJson(Map<String, dynamic> json) {
@@ -29,6 +31,7 @@ class AuthenticatedUser {
       email: json['email'] ?? '',
       role: normalizedRole,
       fullName: json['fullName'] ?? '',
+      onboardingCompleted: json['onboardingCompleted'] == true,
     );
   }
 

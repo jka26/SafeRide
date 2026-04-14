@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import '../../theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
 import 'login_screen.dart';
-import 'dashboard/dashboard_screen.dart';
+import 'onboarding_step1_screen.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -109,7 +109,7 @@ class _SignUpScreenState extends State<SignUpScreen>
     final auth = context.read<AuthProvider>();
     if (auth.status == AuthStatus.success && mounted) {
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const DashboardScreen()),
+        MaterialPageRoute(builder: (_) => const OnboardingStep1Screen()),
         (route) => false,
       );
     }

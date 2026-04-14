@@ -51,12 +51,14 @@ export class AuthService {
           passwordHash,
           role: normalizedRole,
           fullName: dto.fullName,
+          onboardingCompleted: false,
         },
         select: {
           id: true,
           email: true,
           role: true,
           fullName: true,
+          onboardingCompleted: true,
         },
       });
 
@@ -102,6 +104,7 @@ export class AuthService {
         email: user.email,
         role: user.role,
         fullName: user.fullName,
+        onboardingCompleted: user.onboardingCompleted,
       },
     };
   }

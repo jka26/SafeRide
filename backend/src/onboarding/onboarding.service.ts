@@ -75,6 +75,11 @@ export class OnboardingService {
             },
           });
 
+    await this.prisma.user.update({
+      where: { id: actor.id },
+      data: { onboardingCompleted: true },
+    });
+
     return {
       message:
           existingStudent == null
@@ -114,6 +119,11 @@ export class OnboardingService {
         plateNumber: true,
         routeName: true,
       },
+    });
+
+    await this.prisma.user.update({
+      where: { id: actor.id },
+      data: { onboardingCompleted: true },
     });
 
     return {

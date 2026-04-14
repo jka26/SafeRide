@@ -33,6 +33,7 @@ model User {
   passwordHash String
   role         Role
   fullName     String
+  onboardingCompleted Boolean @default(false)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   sessions     Session[]
