@@ -6,9 +6,10 @@ import { TripActionsService } from './trip-actions.service';
 import { DriverTripsController } from './driver-trips.controller';
 import { ParentTrackingController } from './parent-tracking.controller';
 import { TrackingGateway } from './tracking.gateway';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-  imports: [DatabaseModule],
+  imports: [DatabaseModule, NotificationsModule],
   controllers: [
     TripsController,
     DriverTripsController,

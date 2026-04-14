@@ -3,14 +3,19 @@ import {
     Injectable,
     NotFoundException,
 } from '@nestjs/common';
+import { AttendanceStatus } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { MarkAttendanceDto } from './dto/mark-attendance.dto';
 import { AppRole } from '../common/auth/roles.enum';
 import type { AuthenticatedUser } from '../common/auth/authenticated-user.interface';
+import { FcmService } from '../notifications/fcm.service';
 
 @Injectable()
 export class AttendanceService {
-    constructor(private readonly prisma: PrismaService) { }
+    constructor(
+        private readonly prisma: PrismaService,
+        private readonly fcm: FcmService,
+    ) {}
 
     /**
      * Mark or upsert attendance for a student on a trip.
@@ -46,7 +51,7 @@ export class AttendanceService {
         }
 
         // Upsert so calling the endpoint twice is idempotent
-        return this.prisma.attendance.upsert({
+        const record = await this.prisma.attendance.upsert({
             where: {
                 studentId_tripId: {
                     studentId: dto.studentId,
@@ -69,6 +74,43 @@ export class AttendanceService {
                 trip: { select: { id: true, name: true, tripDate: true } },
             },
         });
+
+        // Fire-and-forget push notification to the student's parent
+        const name = record.student.fullName;
+        const tripName = record.trip.name;
+        const tripData = { type: 'attendance', studentId: dto.studentId, tripId: dto.tripId };
+
+        if (dto.status === AttendanceStatus.BOARDED) {
+            void this.fcm.notifyParentOfStudent(
+                dto.studentId,
+                `${name} has boarded`,
+                `${name} is on the bus for ${tripName}.`,
+                tripData,
+            );
+        } else if (dto.status === AttendanceStatus.ALIGHTED) {
+            void this.fcm.notifyParentOfStudent(
+                dto.studentId,
+                `${name} has arrived`,
+                `${name} has alighted from the bus.`,
+                tripData,
+            );
+        } else if (dto.status === AttendanceStatus.ABSENT) {
+            void this.fcm.notifyParentOfStudent(
+                dto.studentId,
+                `\u26a0\ufe0f ${name} marked absent`,
+                `${name} was marked absent on ${tripName}. Contact the school if unexpected.`,
+                tripData,
+            );
+        } else if (dto.status === AttendanceStatus.PRESENT) {
+            void this.fcm.notifyParentOfStudent(
+                dto.studentId,
+                `${name} is present`,
+                `${name} is confirmed present on ${tripName}.`,
+                tripData,
+            );
+        }
+
+        return record;
     }
 
     /**

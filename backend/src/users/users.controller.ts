@@ -5,6 +5,7 @@ import { AppRole } from '../common/auth/roles.enum';
 import { CurrentUser } from '../common/auth/current-user.decorator';
 import type { AuthenticatedUser } from '../common/auth/authenticated-user.interface';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { RegisterFcmTokenDto } from './dto/register-fcm-token.dto';
 
 @Controller('users')
 export class UsersController {
@@ -21,6 +22,14 @@ export class UsersController {
     @Body() dto: UpdateProfileDto,
   ) {
     return this.usersService.updateProfile(user, dto);
+  }
+
+  @Patch('me/fcm-token')
+  registerFcmToken(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: RegisterFcmTokenDto,
+  ) {
+    return this.usersService.saveFcmToken(user.id, dto.token);
   }
 
   @Get()

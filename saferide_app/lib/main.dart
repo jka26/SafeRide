@@ -1,3 +1,4 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:provider/provider.dart';
@@ -6,6 +7,7 @@ import 'providers/auth_provider.dart';
 import 'providers/dashboard_provider.dart';
 import 'providers/csv_upload_provider.dart';
 import 'providers/onboarding_provider.dart';
+import 'services/push_notification_service.dart';
 import 'theme/app_theme.dart';
 import 'screens/welcome_screen.dart';
 import 'screens/dashboard/dashboard_screen.dart';
@@ -13,6 +15,9 @@ import 'screens/dashboard/dashboard_screen.dart';
 void main() async {
   WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
   FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
+
+  // Initialize Firebase before anything else
+  await Firebase.initializeApp();
 
   // Restore persisted session token before the app renders anything
   await SessionStore.instance.load();
@@ -57,6 +62,10 @@ class _SafeRideAppState extends State<SafeRideApp> {
         _hasSession = restored;
         _ready = true;
       });
+      // Register FCM token now that we have a valid session
+      if (restored) {
+        unawaited(PushNotificationService.instance.initialize());
+      }
     } else {
       setState(() {
         _hasSession = false;
@@ -82,10 +91,13 @@ class _SafeRideAppState extends State<SafeRideApp> {
     return MaterialApp(
       title: 'SafeRide School',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,      // ← colours, fonts, button styles
+      theme: AppTheme.lightTheme,
       home: _hasSession
-          ? const DashboardScreen()   // ← returning user
-          : const WelcomeScreen(),    // ← new / logged out user
+          ? const DashboardScreen()
+          : const WelcomeScreen(),
     );
   }
 }
+
+/// Runs a future without awaiting — used for fire-and-forget side effects.
+void unawaited(Future<void> future) {}

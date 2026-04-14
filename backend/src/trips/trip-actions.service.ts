@@ -10,12 +10,14 @@ import { AppRole } from '../common/auth/roles.enum';
 import type { AuthenticatedUser } from '../common/auth/authenticated-user.interface';
 import { TrackingGateway } from './tracking.gateway';
 import type { UpdateTripProgressDto } from './dto/update-trip-progress.dto';
+import { FcmService } from '../notifications/fcm.service';
 
 @Injectable()
 export class TripActionsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly trackingGateway: TrackingGateway,
+    private readonly fcm: FcmService,
   ) {}
 
   async startTrip(tripId: string, actor: AuthenticatedUser) {
@@ -30,7 +32,7 @@ export class TripActionsService {
     if (trip.status !== TripStatus.SCHEDULED) {
       throw new BadRequestException('Only scheduled trips can be started');
     }
-    return this.prisma.trip.update({
+    const updated = await this.prisma.trip.update({
       where: { id: tripId },
       data: {
         status: TripStatus.IN_PROGRESS,
@@ -42,6 +44,15 @@ export class TripActionsService {
         driver: { include: { user: true } },
       },
     });
+
+    void this.fcm.notifyParentsOfTrip(
+      tripId,
+      'Bus trip started',
+      `The bus for ${updated.bus.routeName} has departed. Track it live in the app.`,
+      { type: 'trip_started', tripId },
+    );
+
+    return updated;
   }
 
   async endTrip(tripId: string, actor: AuthenticatedUser) {
@@ -56,7 +67,7 @@ export class TripActionsService {
     if (trip.status !== TripStatus.IN_PROGRESS) {
       throw new BadRequestException('Trip is not in progress');
     }
-    return this.prisma.trip.update({
+    const updated = await this.prisma.trip.update({
       where: { id: tripId },
       data: {
         status: TripStatus.COMPLETED,
@@ -67,6 +78,15 @@ export class TripActionsService {
         driver: { include: { user: true } },
       },
     });
+
+    void this.fcm.notifyParentsOfTrip(
+      tripId,
+      'Trip completed',
+      `${updated.name} has ended safely.`,
+      { type: 'trip_ended', tripId },
+    );
+
+    return updated;
   }
 
   async reportLocation(
@@ -118,7 +138,7 @@ export class TripActionsService {
     ) {
       throw new BadRequestException('Trip cannot be updated in its current state');
     }
-    return this.prisma.trip.update({
+    const updated = await this.prisma.trip.update({
       where: { id: tripId },
       data: {
         ...(dto.currentStopName !== undefined && {
@@ -128,6 +148,19 @@ export class TripActionsService {
       },
       include: { bus: true, driver: { include: { user: true } } },
     });
+
+    // Only send a push when the stop name changes — not on every ETA tick
+    if (dto.currentStopName !== undefined) {
+      const etaText = dto.etaMinutes ? ` · ETA ${dto.etaMinutes} min` : '';
+      void this.fcm.notifyParentsOfTrip(
+        tripId,
+        'Bus stop update',
+        `Now at ${dto.currentStopName}${etaText}.`,
+        { type: 'stop_update', tripId },
+      );
+    }
+
+    return updated;
   }
 
   async getLiveForParent(tripId: string, actor: AuthenticatedUser) {

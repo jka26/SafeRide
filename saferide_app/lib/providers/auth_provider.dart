@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../api/api_client.dart';
 import '../api/session_store.dart';
+import '../services/push_notification_service.dart';
 
 enum UserRole { parent, driver, admin }
 
@@ -117,6 +118,7 @@ class AuthProvider extends ChangeNotifier {
       }
       _status = AuthStatus.success;
       _errorMessage = null;
+      PushNotificationService.instance.initialize();
     } on ApiException catch (e) {
       _setError(e.message);
     } catch (e) {
@@ -162,6 +164,7 @@ class AuthProvider extends ChangeNotifier {
       }
       _status = AuthStatus.success;
       _errorMessage = null;
+      PushNotificationService.instance.initialize();
     } on ApiException catch (e) {
       _setError(e.message);
     } catch (e) {

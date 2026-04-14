@@ -44,4 +44,12 @@ export class UsersService {
       select: { id: true, email: true, role: true, fullName: true },
     });
   }
+
+  saveFcmToken(userId: string, token: string) {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { fcmToken: token },
+      select: { id: true },
+    });
+  }
 }
